@@ -1,0 +1,23 @@
+{
+  "name": "3d-sketches",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "canvas-sketch --output=renders --stream=gif --fps=24",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "winkerVSbecks",
+  "license": "MIT",
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.0.20",
+    "canvas-sketch": "^0.7.3",
+    "canvas-sketch-cli": "^1.11.7",
+    "canvas-sketch-util": "^1.10.0",
+    "paper-colors": "^1.0.0",
+    "riso-colors": "^1.0.1",
+    "three": "^0.117.1",
+    "three.meshline": "^1.2.0"
+  }
+}
