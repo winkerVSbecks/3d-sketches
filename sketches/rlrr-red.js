@@ -2,7 +2,7 @@ import { ShaderMaterial } from 'three';
 global.THREE = require('three');
 require('three/examples/js/controls/OrbitControls');
 const canvasSketch = require('canvas-sketch');
-const { lerpArray } = require('canvas-sketch-util/math');
+const { lerpArray, mapRange } = require('canvas-sketch-util/math');
 const Random = require('canvas-sketch-util/random');
 const clrs = require('../clrs')();
 
@@ -16,23 +16,24 @@ const settings = {
   dimensions: [800, 800],
   // Make the loop animated
   animate: true,
-  duration: 2,
+  duration: 4,
   // Get a WebGL canvas rather than 2D
   context: 'webgl',
 };
 
-const sketch = ({ width, height, context }) => {
+const sketch = ({ context }) => {
   // Create a renderer
   const renderer = new THREE.WebGLRenderer({
     canvas: context.canvas,
   });
 
+  const foreground = clrs.ink();
+
   // WebGL background color
-  renderer.setClearColor(clrs.bg, 1);
+  renderer.setClearColor('#fefefe', 1);
 
   // Setup a camera
-  // const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100);
-  const camera = new THREE.OrthographicCamera(-7.5, 7.5, -7.5, 7.5, 0.01, 100);
+  const camera = new THREE.OrthographicCamera(-6, 6, -6, 6, 0.01, 100);
   camera.position.set(0, 0, -20);
   camera.lookAt(new THREE.Vector3());
 
@@ -42,60 +43,112 @@ const sketch = ({ width, height, context }) => {
   // Setup your scene
   const scene = new THREE.Scene();
 
-  // var light = new THREE.PointLight(0xffffff, 1, 0);
-  // light.position.set(0, 0, -20);
-  // scene.add(light);
-
-  // var pointLightHelper = new THREE.PointLightHelper(light, 1);
-  // scene.add(pointLightHelper);
-
   // Setup a geometry
-  // const geometry = new THREE.PlaneBufferGeometry(10, 10, 5, 5);
   const geometry = sculptureGeometry(10, 10, 5, 5);
   geometry.computeVertexNormals();
 
-  // Setup a material
+  // Shader material that darkens the vertex
+  // color based on the vertex normal
   const vertexShader = /* glsl */ `
-    varying vec3 vNormal;
+    varying vec4 vertColor;
+
+    uniform float uTime;
+    uniform vec3 uLightPosition;
+    uniform vec3 uColor;
+
+    vec3 rgb2hsb( in vec3 c ){
+        vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+        vec4 p = mix(vec4(c.bg, K.wz),
+                    vec4(c.gb, K.xy),
+                    step(c.b, c.g));
+        vec4 q = mix(vec4(p.xyw, c.r),
+                    vec4(c.r, p.yzx),
+                    step(p.x, c.r));
+        float d = q.x - min(q.w, q.y);
+        float e = 1.0e-10;
+        return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)),
+                    d / (q.x + e),
+                    q.x);
+    }
+
+    //  Function from Iñigo Quiles
+    //  https://www.shadertoy.com/view/MsS3Wc
+    vec3 hsb2rgb( in vec3 c ){
+        vec3 rgb = clamp(abs(mod(c.x*6.0+vec3(0.0,4.0,2.0),
+                                6.0)-3.0)-1.0,
+                        0.0,
+                        1.0 );
+        rgb = rgb*rgb*(3.0-2.0*rgb);
+        return c.z * mix(vec3(1.0), rgb, c.y);
+    }
 
     void main () {
-      vNormal  = (normalize(normal) * 0.5 ) + 0.5;
+      // vec3 ecPosition = vec3(modelViewMatrix * vec4(position, 1.0));
+      // vec3 ecNormal = normalize(normalMatrix * normal);
+      // vec3 direction = normalize(uLightPosition.xyz - ecPosition);
+      // float intensity = max(0.0, dot(direction, ecNormal));
+      // vertColor = vec4(intensity, intensity, intensity, 1.0) * vec4(uColor, 1.0);
+
+      // vec3 vNormal  = normalMatrix * normal;
+      // vec3 intensity = (normalize(normal) * 0.5) + 0.5;
+      // vec3 col = uColor / intensity.x * intensity.y * intensity.z;
+      // vertColor = vec4(uColor * col, 1.0);
+
+      vec3 intensity = normalize( normal ) * 0.5 + 0.5;
+      vec3 col = rgb2hsb(uColor) * vec3(1.0, intensity.xy);
+      vertColor = vec4(hsb2rgb(col), 1.0);
+
+      // vec3 ecPosition = vec3(modelViewMatrix * vec4(position, 1.0));
+      // vec3 ecNormal = normalize(normalMatrix * normal);
+      // vec3 direction = normalize(uLightPosition.xyz - ecPosition);
+      // float intensity = abs(dot(direction, ecNormal));
+      // vec3 col = rgb2hsb(uColor);
+      // col.z = col.z - 0.25 * intensity;
+      // vertColor = vec4(hsb2rgb(col), 1.0);
+
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }
   `;
 
   const fragmentShader = /* glsl */ `
-    varying vec3 vNormal;
-    uniform vec3 uInk;
+    varying vec4 vertColor;
 
     void main() {
-        vec3 view_nv  = normalize(vNormal);
-        vec3 intensity = vNormal ;
-        // vec3 c = uInk * max(intensity.x, max(intensity.y, intensity.z));
-        vec3 c = uInk / intensity.x * intensity.y * intensity.z;
-        gl_FragColor  = vec4(c, 1.0);
+      gl_FragColor = vertColor;
     }
   `;
 
   const material = new THREE.ShaderMaterial({
     uniforms: {
-      uInk: {
-        value: new THREE.Color(clrs.ink()),
-      },
+      uColor: { value: new THREE.Color(foreground) },
+      uLightPosition: { value: camera.position.clone().multiplyScalar(-1) },
     },
     vertexShader,
     fragmentShader,
-    // side: THREE.DoubleSide,
   });
 
-  // const material = new THREE.MeshNormalMaterial({
-  //   flatShading: true,
-  //   side: THREE.DoubleSide,
-  // });
+  const wireFrameMaterial = new THREE.MeshBasicMaterial({
+    color: foreground,
+    wireframe: true,
+    flatShading: true,
+  });
+
+  const normalMaterial = new THREE.MeshNormalMaterial({
+    flatShading: true,
+  });
+
+  // const light = new THREE.PointLight(foreground, 1, 100);
+  // light.position.set(0, 0, 20);
+  // scene.add(light);
+  // const pointLightHelper = new THREE.PointLightHelper(light, 1);
+  // scene.add(pointLightHelper);
 
   // Setup a mesh with geometry + material
-  const mesh = new THREE.Mesh(geometry, material);
+  const geom = new THREE.PlaneGeometry(10, 10, 5, 5);
+  const mesh = new THREE.Mesh(geom, wireFrameMaterial);
   scene.add(mesh);
+
+  let state = 'init';
 
   // draw each frame
   return {
@@ -107,7 +160,31 @@ const sketch = ({ width, height, context }) => {
       camera.updateProjectionMatrix();
     },
     // Update & render your scene here
-    render({ time }) {
+    render({ playhead }) {
+      const t = Math.floor(mapRange(playhead, 0, 1, 0, 5));
+
+      if (t === 0 && state !== 'init') {
+        state = 'init';
+        renderer.setClearColor('#fefefe', 1);
+        mesh.geometry = new THREE.PlaneGeometry(10, 10, 5, 5);
+        mesh.material = wireFrameMaterial;
+      } else if (t === 1 && state === 'init') {
+        const geometry = sculptureGeometry(10, 10, 5, 5);
+        geometry.computeVertexNormals();
+        // mesh.geometry.dispose();
+        mesh.geometry = geometry;
+        state = 'sculpt';
+      } else if (t === 2 && state === 'sculpt') {
+        // mesh.material.dispose();
+        mesh.material = normalMaterial;
+        state = 'normal';
+      } else if (t === 3 && state === 'normal') {
+        renderer.setClearColor(foreground, 1);
+        // mesh.material.dispose();
+        mesh.material = material;
+        state = 'final';
+      }
+
       controls.update();
       renderer.render(scene, camera);
     },
@@ -138,7 +215,7 @@ function sculptureGeometry(
   const segmentWidth = width / gridX;
   const segmentHeight = height / gridY;
 
-  const faces = [];
+  const tiles = [];
 
   /**
    * Create the base grid with each segment
@@ -161,34 +238,39 @@ function sculptureGeometry(
 
       // Ordered so that the first
       // two vertices are on the outside
-      faces.push([
-        [x0, -y0, 0],
-        [x0, -y2, 0],
-        [x1, -y1, 0],
-      ]);
-      faces.push([
-        [x2, -y0, 0],
-        [x0, -y0, 0],
-        [x1, -y1, 0],
-      ]);
-      faces.push([
-        [x2, -y2, 0],
-        [x2, -y0, 0],
-        [x1, -y1, 0],
-      ]);
-      faces.push([
-        [x0, -y2, 0],
-        [x2, -y2, 0],
-        [x1, -y1, 0],
+      tiles.push([
+        [
+          [x0, -y0, 0],
+          [x0, -y2, 0],
+          [x1, -y1, 0],
+        ],
+        [
+          [x2, -y0, 0],
+          [x0, -y0, 0],
+          [x1, -y1, 0],
+        ],
+        [
+          [x2, -y2, 0],
+          [x2, -y0, 0],
+          [x1, -y1, 0],
+        ],
+        [
+          [x0, -y2, 0],
+          [x2, -y2, 0],
+          [x1, -y1, 0],
+        ],
       ]);
     }
   }
 
   const vertices = [];
 
-  for (const face of faces) {
-    const [a, b, c] = face;
-    vertices.push(...subdivide()(a, b, c));
+  for (const tile of tiles) {
+    pickTileType().forEach((type, idx) => {
+      const face = tile[idx];
+      const [a, b, c] = face;
+      vertices.push(...type(a, b, c));
+    });
   }
 
   geometry.setAttribute(
@@ -197,11 +279,6 @@ function sculptureGeometry(
   );
 
   return geometry;
-}
-
-const subdivisionTypes = [subdivideA, subdivideB, subdivideC];
-function subdivide() {
-  return Random.pick(subdivisionTypes);
 }
 
 const ELEVATION = 0.25;
@@ -217,7 +294,7 @@ const ELEVATION = 0.25;
  *           c
  *
  */
-function subdivideA(a, b, c) {
+function subdivideInCenter(a, b, c) {
   const mp = lerpArray(a, b, 0.5);
   const d = lerpArray(c, mp, 0.5);
   d[2] = ELEVATION;
@@ -236,16 +313,62 @@ function subdivideA(a, b, c) {
  *           c
  *
  */
-function subdivideB(a, b, c) {
-  const side = Random.pick([
-    [a, c],
-    [b, c],
-  ]);
+function subdivideOnEdge(edge = 0) {
+  return (a, b, c) => {
+    const side = [
+      [a, c],
+      [b, c],
+    ][edge];
 
-  const d = lerpArray(...side, 0.5);
+    const d = lerpArray(...side, 0.5);
+    d[2] = ELEVATION;
+
+    return [b, d, a, a, d, c, c, d, b].flat();
+  };
+}
+
+/**
+ *
+ *    a *********** b
+ *       *********
+ *        *******
+ *         *****
+ *          ***
+ *           *  ◾️ d (elevated)
+ *           c
+ *
+ */
+function subdivideOnFaceEdge(edge = 0) {
+  return (a, b, c) => {
+    const axis = [0, 1].find((idx) => a[idx] !== b[idx]);
+    const dir = edge === 0 ? a : b;
+    const dest = [...c];
+    dest[axis] = dir[axis];
+
+    const d = lerpArray(c, dest, 0.5);
+    d[2] = ELEVATION;
+
+    return [b, d, a, a, d, c, c, d, b].flat();
+  };
+}
+
+/**
+ *          mp
+ *    a *****◾️***** b
+ *       *********
+ *        ***◾️----- d (elevated)
+ *         .....
+ *          ...
+ *           .
+ *           c
+ *
+ */
+function subdivideSmallRaisedFullFace(a, b, c) {
+  const mp = lerpArray(a, b, 0.5);
+  const d = lerpArray(c, mp, 0.5);
   d[2] = ELEVATION;
 
-  return [b, d, a, a, d, c, c, d, b].flat();
+  return [b, d, a].flat();
 }
 
 /**
@@ -258,7 +381,84 @@ function subdivideB(a, b, c) {
  *           c, d(elevated)
  *
  */
-function subdivideC(a, b, c) {
+function subdivideRaisedFullFace(a, b, c) {
   const d = [c[0], c[1], ELEVATION];
   return [a, d, c, c, d, b, a, b, d].flat();
+}
+
+//    2
+// 1     3
+//    4
+const tileTypes = [
+  [
+    subdivideRaisedFullFace,
+    subdivideRaisedFullFace,
+    subdivideRaisedFullFace,
+    subdivideRaisedFullFace,
+  ],
+  [
+    subdivideOnEdge(0),
+    subdivideOnEdge(1),
+    subdivideInCenter,
+    subdivideInCenter,
+  ],
+  [
+    subdivideOnEdge(1),
+    subdivideOnEdge(0),
+    subdivideOnEdge(1),
+    subdivideOnEdge(0),
+  ],
+  [
+    subdivideInCenter,
+    subdivideInCenter,
+    subdivideOnEdge(0),
+    subdivideOnEdge(1),
+  ],
+  [subdivideInCenter, subdivideInCenter, subdivideInCenter, subdivideInCenter],
+  [
+    subdivideInCenter,
+    subdivideOnEdge(0),
+    subdivideOnEdge(1),
+    subdivideInCenter,
+  ],
+  [
+    subdivideOnEdge(0),
+    subdivideOnEdge(1),
+    subdivideOnEdge(0),
+    subdivideOnEdge(1),
+  ],
+  [
+    subdivideOnEdge(1),
+    subdivideInCenter,
+    subdivideInCenter,
+    subdivideOnEdge(0),
+  ],
+  [
+    subdivideSmallRaisedFullFace,
+    subdivideOnFaceEdge(1),
+    subdivideInCenter,
+    subdivideOnFaceEdge(0),
+  ],
+  [
+    subdivideOnFaceEdge(0),
+    subdivideSmallRaisedFullFace,
+    subdivideOnFaceEdge(1),
+    subdivideInCenter,
+  ],
+  [
+    subdivideInCenter,
+    subdivideOnFaceEdge(0),
+    subdivideSmallRaisedFullFace,
+    subdivideOnFaceEdge(1),
+  ],
+  [
+    subdivideOnFaceEdge(1),
+    subdivideInCenter,
+    subdivideOnFaceEdge(0),
+    subdivideSmallRaisedFullFace,
+  ],
+];
+
+function pickTileType() {
+  return Random.pick(tileTypes);
 }
