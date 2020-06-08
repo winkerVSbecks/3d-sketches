@@ -1,16 +1,13 @@
-import { ShaderMaterial } from 'three';
+/**
+ * Inspired by:
+ * https://www.artsy.net/artwork/matt-shlian-rlrr-red
+ */
 global.THREE = require('three');
 require('three/examples/js/controls/OrbitControls');
 const canvasSketch = require('canvas-sketch');
 const { lerpArray, mapRange } = require('canvas-sketch-util/math');
 const Random = require('canvas-sketch-util/random');
 const clrs = require('../clrs')();
-
-// Maroon #590A07
-// Tomato #ED4844 vec3(0.929, 0.282, 0.266);
-// Light Grey #D3D2D0
-// Saddle Brown #8F1311
-// Brick Red #C92C2A
 
 const settings = {
   dimensions: [800, 800],
@@ -83,28 +80,24 @@ const sketch = ({ context }) => {
     }
 
     void main () {
+      // Processing light shader
       // vec3 ecPosition = vec3(modelViewMatrix * vec4(position, 1.0));
       // vec3 ecNormal = normalize(normalMatrix * normal);
       // vec3 direction = normalize(uLightPosition.xyz - ecPosition);
       // float intensity = max(0.0, dot(direction, ecNormal));
       // vertColor = vec4(intensity, intensity, intensity, 1.0) * vec4(uColor, 1.0);
 
+      // MeshNormalMaterial style
       // vec3 vNormal  = normalMatrix * normal;
       // vec3 intensity = (normalize(normal) * 0.5) + 0.5;
       // vec3 col = uColor / intensity.x * intensity.y * intensity.z;
       // vertColor = vec4(uColor * col, 1.0);
 
-      vec3 intensity = normalize( normal ) * 0.5 + 0.5;
-      vec3 col = rgb2hsb(uColor) * vec3(1.0, intensity.xy);
+      // MeshNormalMaterial with hsb to adjust s & b
+      // best one?
+      vec3 intensity = normalize(normal) * 0.5 + 0.5;
+      vec3 col = rgb2hsb(uColor) * vec3(1.0, intensity.x * 2.0, intensity.y);
       vertColor = vec4(hsb2rgb(col), 1.0);
-
-      // vec3 ecPosition = vec3(modelViewMatrix * vec4(position, 1.0));
-      // vec3 ecNormal = normalize(normalMatrix * normal);
-      // vec3 direction = normalize(uLightPosition.xyz - ecPosition);
-      // float intensity = abs(dot(direction, ecNormal));
-      // vec3 col = rgb2hsb(uColor);
-      // col.z = col.z - 0.25 * intensity;
-      // vertColor = vec4(hsb2rgb(col), 1.0);
 
       gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }

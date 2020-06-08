@@ -1,4 +1,7 @@
-// Inspired by https://www.artsy.net/artwork/matt-shlian-unholy-153-now-we-put-the-river-to-sleep-number-3
+/**
+ * Inspired by
+ * https://www.artsy.net/artwork/matt-shlian-unholy-153-now-we-put-the-river-to-sleep-number-3
+ */
 const Random = require('canvas-sketch-util/random');
 const { MeshLine, MeshLineMaterial } = require('three.meshline');
 const clrs = require('../clrs')();
