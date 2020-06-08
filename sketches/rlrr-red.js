@@ -30,7 +30,7 @@ const sketch = ({ context }) => {
   const foreground = clrs.ink();
 
   // WebGL background color
-  renderer.setClearColor('#fefefe', 1);
+  renderer.setClearColor(foreground, 1);
 
   // Setup a camera
   const camera = new THREE.OrthographicCamera(-6, 6, -6, 6, 0.01, 100);
@@ -144,8 +144,8 @@ const sketch = ({ context }) => {
   // scene.add(pointLightHelper);
 
   // Setup a mesh with geometry + material
-  const geom = new THREE.PlaneGeometry(10, 10, 5, 5);
-  const mesh = new THREE.Mesh(geom, wireFrameMaterial);
+  const planeGeometry = new THREE.PlaneGeometry(10, 10, 5, 5);
+  const mesh = new THREE.Mesh(geometry, material);
   scene.add(mesh);
 
   let state = 'init';
@@ -161,29 +161,29 @@ const sketch = ({ context }) => {
     },
     // Update & render your scene here
     render({ playhead }) {
-      const t = Math.floor(mapRange(playhead, 0, 1, 0, 5));
+      // const t = Math.floor(mapRange(playhead, 0, 1, 0, 5));
 
-      if (t === 0 && state !== 'init') {
-        state = 'init';
-        renderer.setClearColor('#fefefe', 1);
-        mesh.geometry = new THREE.PlaneGeometry(10, 10, 5, 5);
-        mesh.material = wireFrameMaterial;
-      } else if (t === 1 && state === 'init') {
-        const geometry = sculptureGeometry(10, 10, 5, 5);
-        geometry.computeVertexNormals();
-        // mesh.geometry.dispose();
-        mesh.geometry = geometry;
-        state = 'sculpt';
-      } else if (t === 2 && state === 'sculpt') {
-        // mesh.material.dispose();
-        mesh.material = normalMaterial;
-        state = 'normal';
-      } else if (t === 3 && state === 'normal') {
-        renderer.setClearColor(foreground, 1);
-        // mesh.material.dispose();
-        mesh.material = material;
-        state = 'final';
-      }
+      // if (t === 0 && state !== 'init') {
+      //   state = 'init';
+      //   renderer.setClearColor('#fefefe', 1);
+      //   mesh.geometry = new THREE.PlaneGeometry(10, 10, 5, 5);
+      //   mesh.material = wireFrameMaterial;
+      // } else if (t === 1 && state === 'init') {
+      //   const geometry = sculptureGeometry(10, 10, 5, 5);
+      //   geometry.computeVertexNormals();
+      //   // mesh.geometry.dispose();
+      //   mesh.geometry = geometry;
+      //   state = 'sculpt';
+      // } else if (t === 2 && state === 'sculpt') {
+      //   // mesh.material.dispose();
+      //   mesh.material = normalMaterial;
+      //   state = 'normal';
+      // } else if (t === 3 && state === 'normal') {
+      //   renderer.setClearColor(foreground, 1);
+      //   // mesh.material.dispose();
+      //   mesh.material = material;
+      //   state = 'final';
+      // }
 
       controls.update();
       renderer.render(scene, camera);
