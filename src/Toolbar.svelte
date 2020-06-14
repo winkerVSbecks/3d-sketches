@@ -76,10 +76,6 @@
     flex: 1 1 auto;
   }
 
-  button:last-child {
-    margin-left: 0.5rem;
-  }
-
   svg {
     vertical-align: middle;
   }
