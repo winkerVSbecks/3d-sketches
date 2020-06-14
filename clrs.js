@@ -1,5 +1,5 @@
 const Random = require('canvas-sketch-util/random');
-const Color = require('canvas-sketch-util/Color');
+const Color = require('canvas-sketch-util/color');
 const risoColors = require('riso-colors').map((h) => h.hex);
 const paperColors = require('paper-colors').map((h) => h.hex);
 
