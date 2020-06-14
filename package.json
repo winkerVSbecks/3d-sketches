@@ -8,6 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "sketches:build": "sh build-sketches.sh",
     "app:build": "rollup -c",
+    "build": "npm run sketches:build && npm run app:build",
     "app:dev": "rollup -c -w",
     "app:start": "sirv public"
   },
