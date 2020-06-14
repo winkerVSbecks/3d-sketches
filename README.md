@@ -1,15 +1,16 @@
 # 3D Sketches
 
-## Canvas Sketch
+### Canvas Sketch
+
 ```sh
 cd 3d-sketches
 $ npm install
 $ npm start sketches/sketch_name.js
 ```
 
-# Gallery App
+## Gallery App
 
-## Get started
+### Get started
 
 Install the dependencies...
 
