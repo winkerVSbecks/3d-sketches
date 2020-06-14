@@ -16,14 +16,9 @@ require('three/examples/js/renderers/SVGRenderer');
 const canvasSketch = require('canvas-sketch');
 
 const settings = {
-  // dimensions: [21.59, 13.97],
-  dimensions: [1600, 1600],
-  orientation: 'landscape',
-  // pixelsPerInch: 300,
+  // dimensions: [1600, 1600],
   scaleToView: true,
   context: 'webgl',
-  // units: 'cm',
-  // prefix: '8.5x5.5-',
 };
 
 const sketch = ({ context, width, height, canvas }) => {
@@ -33,7 +28,7 @@ const sketch = ({ context, width, height, canvas }) => {
   const minContrast = 3;
   // const fogColor = palette.shift(); // 0x222222
   const inkColors = risoColors.filter(
-    (color) => Color.contrastRatio(background, color) >= minContrast,
+    (color) => Color.contrastRatio(background, color) >= minContrast
   );
   const foreground = Random.pick(inkColors); // #00AA93
 
@@ -97,7 +92,7 @@ const sketch = ({ context, width, height, canvas }) => {
     new THREE.MeshStandardMaterial({
       color: '#FF4C65',
       visible: false,
-    }),
+    })
   );
   convergence.position.y = 1;
   convergence.position.x = 1;
@@ -118,7 +113,7 @@ const sketch = ({ context, width, height, canvas }) => {
     Math.abs(sculptureSize.max.z - sculptureSize.min.z),
     0.5,
     1,
-    1,
+    1
   );
   const plane = makeMesh2(planeGeometry, foreground, background); // new THREE.Mesh(planeGeometry, planeMaterial);
   plane.rotateX(Math.PI / 2);
@@ -165,7 +160,7 @@ function pyramidGeometry({ s = 1, h = 2 }) {
     new THREE.Vector3(0, 0, 0),
     new THREE.Vector3(s, 0, 0),
     new THREE.Vector3(s, 0, s),
-    new THREE.Vector3(0, 0, s),
+    new THREE.Vector3(0, 0, s)
   );
 
   geometry.faces.push(
@@ -174,7 +169,7 @@ function pyramidGeometry({ s = 1, h = 2 }) {
     new THREE.Face3(4, 3, 0),
     new THREE.Face3(1, 4, 0),
     new THREE.Face3(1, 2, 3),
-    new THREE.Face3(1, 3, 4),
+    new THREE.Face3(1, 3, 4)
   );
 
   geometry.add;
@@ -275,7 +270,7 @@ function makeMesh2(geometry, fill = background, stroke = '#FFB511') {
   });
   const wireframe = new THREE.LineSegments(
     wireframeGeometry,
-    wireframeMaterial,
+    wireframeMaterial
   );
   mesh.add(wireframe);
 

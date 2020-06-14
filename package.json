@@ -5,7 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "canvas-sketch --output=renders --stream=gif --fps=24",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "sketches:build": "sh build-sketches.sh",
+    "app:build": "rollup -c",
+    "app:dev": "rollup -c -w",
+    "app:start": "sirv public"
   },
   "keywords": [],
   "author": "winkerVSbecks",
@@ -17,7 +21,18 @@
     "canvas-sketch-util": "^1.10.0",
     "paper-colors": "^1.0.0",
     "riso-colors": "^1.0.1",
+    "sirv-cli": "^0.4.4",
     "three": "^0.117.1",
     "three.meshline": "^1.2.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "11.0.2",
+    "@rollup/plugin-json": "^4.1.0",
+    "@rollup/plugin-node-resolve": "^7.0.0",
+    "rollup": "^1.20.0",
+    "rollup-plugin-livereload": "^1.0.0",
+    "rollup-plugin-svelte": "^5.0.3",
+    "rollup-plugin-terser": "^5.1.2",
+    "svelte": "^3.0.0"
   }
 }

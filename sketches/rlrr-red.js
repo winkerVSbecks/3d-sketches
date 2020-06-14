@@ -10,12 +10,13 @@ const Random = require('canvas-sketch-util/random');
 const clrs = require('../clrs')();
 
 const settings = {
-  dimensions: [800, 800],
+  // dimensions: [800, 800],
   // Make the loop animated
   animate: true,
   duration: 4,
   // Get a WebGL canvas rather than 2D
   context: 'webgl',
+  scaleToView: true,
 };
 
 const sketch = ({ context }) => {
@@ -149,7 +150,12 @@ const sketch = ({ context }) => {
     resize({ pixelRatio, viewportWidth, viewportHeight }) {
       renderer.setPixelRatio(pixelRatio);
       renderer.setSize(viewportWidth, viewportHeight, false);
-      camera.aspect = viewportWidth / viewportHeight;
+
+      const aspect = viewportWidth / viewportHeight;
+      camera.left = -6 * aspect;
+      camera.right = 6 * aspect;
+      camera.top = -6;
+      camera.bottom = 6;
       camera.updateProjectionMatrix();
     },
     // Update & render your scene here
@@ -190,12 +196,13 @@ const sketch = ({ context }) => {
 };
 
 canvasSketch(sketch, settings);
+// module.exports = { sketch, settings };
 
 function sculptureGeometry(
   width,
   height,
   widthSegments = 1,
-  heightSegments = 1,
+  heightSegments = 1
 ) {
   const geometry = new THREE.BufferGeometry();
 
@@ -268,7 +275,7 @@ function sculptureGeometry(
 
   geometry.setAttribute(
     'position',
-    new THREE.Float32BufferAttribute(vertices, 3),
+    new THREE.Float32BufferAttribute(vertices, 3)
   );
 
   return geometry;

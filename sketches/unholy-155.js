@@ -13,7 +13,7 @@ require('three/examples/js/controls/OrbitControls');
 const canvasSketch = require('canvas-sketch');
 
 const settings = {
-  dimensions: [1600, 1200],
+  // dimensions: [1600, 1200],
   scaleToView: true,
   animate: true,
   duration: 10,
@@ -65,7 +65,7 @@ const sketch = ({ context, width, height }) => {
       const pyramid = makePyramidMeshWithOutline(
         geometry,
         background,
-        pyramidColor,
+        pyramidColor
       );
 
       pyramid.position.x = xOff;
@@ -80,7 +80,7 @@ const sketch = ({ context, width, height }) => {
 
   const convergence = new THREE.Mesh(
     new THREE.SphereGeometry(0.5),
-    new THREE.MeshStandardMaterial({ visible: false }),
+    new THREE.MeshStandardMaterial({ visible: false })
   );
   convergence.position.y = 1;
 
@@ -101,7 +101,7 @@ const sketch = ({ context, width, height }) => {
     Math.abs(sculptureSize.max.z - sculptureSize.min.z),
     0.5,
     1,
-    1,
+    1
   );
   const plane = makeMeshWithEdge(planeGeometry, foreground, background);
   plane.rotateX(Math.PI / 2);
@@ -143,7 +143,7 @@ function pyramidGeometry({ s = 1, h = 2 }) {
     new THREE.Vector3(0, 0, 0),
     new THREE.Vector3(s, 0, 0),
     new THREE.Vector3(s, 0, s),
-    new THREE.Vector3(0, 0, s),
+    new THREE.Vector3(0, 0, s)
   );
 
   geometry.faces.push(
@@ -152,7 +152,7 @@ function pyramidGeometry({ s = 1, h = 2 }) {
     new THREE.Face3(4, 3, 0),
     new THREE.Face3(1, 4, 0),
     new THREE.Face3(1, 2, 3),
-    new THREE.Face3(1, 3, 4),
+    new THREE.Face3(1, 3, 4)
   );
 
   geometry.computeVertexNormals();
@@ -253,7 +253,7 @@ function makeMeshWithEdge(geometry, fill = background, stroke) {
   });
   const wireframe = new THREE.LineSegments(
     wireframeGeometry,
-    wireframeMaterial,
+    wireframeMaterial
   );
   mesh.add(wireframe);
 
