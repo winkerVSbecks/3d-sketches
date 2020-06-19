@@ -196,7 +196,6 @@ const sketch = ({ context }) => {
 };
 
 canvasSketch(sketch, settings);
-// module.exports = { sketch, settings };
 
 function sculptureGeometry(
   width,
@@ -205,9 +204,6 @@ function sculptureGeometry(
   heightSegments = 1
 ) {
   const geometry = new THREE.BufferGeometry();
-
-  const widthHalf = width / 2;
-  const heightHalf = height / 2;
 
   const gridX = Math.floor(widthSegments);
   const gridY = Math.floor(heightSegments);
