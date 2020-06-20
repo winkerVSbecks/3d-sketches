@@ -21,6 +21,7 @@
     "canvas-sketch-cli": "^1.11.7",
     "canvas-sketch-util": "^1.10.0",
     "paper-colors": "^1.0.0",
+    "query-string": "^6.13.1",
     "riso-colors": "^1.0.1",
     "sirv-cli": "^0.4.4",
     "three": "^0.117.1",

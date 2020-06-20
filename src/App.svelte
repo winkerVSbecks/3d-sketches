@@ -1,9 +1,14 @@
 <script>
   import { onMount } from 'svelte';
+  import queryString from 'query-string';
   import Toolbar from './Toolbar.svelte';
   import { resize } from './resize';
 
-  const sketches = ['rlrr-red', 'unholy-155'];
+  const sketches = [
+    'rlrr-red',
+    'unholy-155',
+    'some-caterpillars-stay-caterpillars',
+  ];
 
   let activeSketch = 0;
   let sketch;
@@ -11,6 +16,15 @@
   let embedElement;
 
   onMount(() => {
+    const params = queryString.parse(location.search);
+    if (params.sketch) {
+      const selection = sketches.findIndex(
+        (sketch) => sketch === params.sketch
+      );
+
+      activeSketch = selection >= 0 ? selection : activeSketch;
+    }
+
     selectSketch();
     resize(embedElement);
     window.addEventListener('resize', () => resize(embedElement));
@@ -38,6 +52,10 @@
       } else if (activeSketch > sketches.length - 1) {
         activeSketch = 0;
       }
+
+      location.search = queryString.stringify({
+        sketch: sketches[activeSketch],
+      });
 
       selectSketch();
     };

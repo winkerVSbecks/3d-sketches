@@ -6,12 +6,13 @@ global.THREE = require('three');
 require('three/examples/js/controls/OrbitControls');
 const canvasSketch = require('canvas-sketch');
 const Random = require('canvas-sketch-util/random');
+const { GridHelper } = require('three');
 const clrs = require('../clrs')();
 
 const settings = {
   // dimensions: [800, 800],
   animate: true,
-  duration: 4,
+  duration: 2,
   context: 'webgl',
 };
 
@@ -87,7 +88,7 @@ const sketch = ({ context }) => {
       // vertColor = vec4(uColor * col, 1.0);
 
       // MeshNormalMaterial with hsb to adjust s & b
-      // best one?
+      // best tileOne?
       vec3 intensity = normalize(normal) * 0.5 + 0.5;
       vec3 col = rgb2hsb(uColor) * vec3(1.0, intensity.x * 2.0, intensity.y);
       vertColor = vec4(hsb2rgb(col), 1.0);
@@ -128,8 +129,15 @@ const sketch = ({ context }) => {
   const geometry = sculptureGeometry(10, 5);
   geometry.computeVertexNormals();
 
-  const mesh = new THREE.Mesh(geometry, material);
-  scene.add(mesh);
+  const sculpture = new THREE.Mesh(geometry, material);
+  // scene.add(sculpture);
+
+  const box = new THREE.Box3().setFromObject(sculpture);
+  box.getCenter(sculpture.position).multiplyScalar(-1);
+
+  const pivot = new THREE.Group();
+  scene.add(pivot);
+  pivot.add(sculpture);
 
   // draw each frame
   return {
@@ -137,7 +145,6 @@ const sketch = ({ context }) => {
     resize({ pixelRatio, viewportWidth, viewportHeight }) {
       renderer.setPixelRatio(pixelRatio);
       renderer.setSize(viewportWidth, viewportHeight, false);
-
       const aspect = viewportWidth / viewportHeight;
       camera.left = -6 * aspect;
       camera.right = 6 * aspect;
@@ -146,7 +153,10 @@ const sketch = ({ context }) => {
       camera.updateProjectionMatrix();
     },
     // Update & render your scene here
-    render() {
+    render({ playhead }) {
+      sculpture.rotation.x = (Math.PI / 16) * Math.sin(playhead * 2 * Math.PI);
+      sculpture.rotation.y = (Math.PI / 16) * Math.cos(playhead * 2 * Math.PI);
+
       controls.update();
       renderer.render(scene, camera);
     },
@@ -171,17 +181,17 @@ function sculptureGeometry(size, segments = 1) {
   const vertices = [];
   const halfSize = size / 2;
 
-  // vertices.push(
-  //   ...tileGeometry({ x: 0, y: 0, tileSize: segmentSize, height: ELEVATION })
-  // );
-
-  for (let iy = 1; iy < grid + 1; iy++) {
-    for (let ix = 1; ix < grid + 1; ix++) {
+  for (let iy = 0; iy < grid; iy++) {
+    for (let ix = 0; ix < grid; ix++) {
       const [x, y] = [halfSize - iy * segmentSize, halfSize - ix * segmentSize];
 
-      vertices.push(
-        ...tileGeometry({ x, y, tileSize: segmentSize, height: ELEVATION })
-      );
+      const geometry = tileGeometry({
+        x,
+        y,
+        tileSize: segmentSize,
+        height: ELEVATION,
+      });
+      vertices.push(...geometry);
     }
   }
 
@@ -195,227 +205,83 @@ function sculptureGeometry(size, segments = 1) {
 
 /**
  *
- *   0    *********
- *   a/3  *       *
- *   2a/3 *       *
- *   a    *********
+ *   0    ***********
+ *        *         *
+ *    a/2 *         *
+ *        *         *
+ *   a    ***********
  *       a          0
  */
 function tileGeometry({ x, y, tileSize: a, height: h }) {
   const leftToRight = Random.chance();
-  let vertices;
-  const xs = [0, a / 3, (2 * a) / 3, a].map((v) => v + x);
-  const ys = [0, a / 3, (2 * a) / 3, a].map((v) => v + y);
+  const xs = [0, a / 2, a].map((v) => v + x);
+  const ys = [0, a / 2, a].map((v) => v + y);
 
-  return rightToLeftTileB(xs, ys, h);
-
-  // if (leftToRight) {
-  //   vertices = leftToRightTile(xs, ys, h);
-  // } else {
-  //   vertices = rightToLeftTile(xs, ys, h);
-  // }
-
-  return vertices;
+  return leftToRight ? tileOne(xs, ys, h) : tileTwo(xs, ys, h);
 }
 
-function leftToRightTile([x0, x1, x2, x3], [y0, y1, y2, y3], h) {
-  /* prettier-ignore */
-  return [
-    // 1
-    x3, y0, 0,
-    x3, y1, h,
-    x2, y0, h,
-
-    // 2
-    x3, y3, 0,
-    x2, y0, h,
-    x3, y1, h,
-
-    x0, y0, 0,
-    x2, y0, h,
-    x3, y3, 0,
-
-    // 3
-    x0, y0, 0,
-    x3, y3, 0,
-    x1, y3, h,
-
-    x0, y0, 0,
-    x1, y3, h,
-    x0, y2, h,
-
-    // 4
-    x0, y2, h,
-    x1, y3, h,
-    x0, y3, 0,
-  ];
-}
-
-// Goes to the right and bottom
-function leftToRightTileA([x0, x1, x2, x3], [y0, y1, y2, y3], h) {
-  /* prettier-ignore */
-  return [
-    // 1
-    x1, y0, 0,
-    x3, y0, 0,
-    x3, y2, 0,
-
-    // 2
-    x1, y0, 0,
-    x3, y2, 0,
-    x3, y3, h,
-
-    x1, y0, 0,
-    x3, y3, h,
-    x0, y0, h,
-
-    // 3
-    x0, y0, h,
-    x3, y3, h,
-    x1, y3, 0,
-
-    x0, y0, h,
-    x1, y3, 0,
-    x0, y2, 0,
-
-    // 4
-    x0, y2, 0,
-    x1, y3, 0,
-    x0, y3, 0,
-  ];
-}
-
-// Goes to the left and top
-function leftToRightTileB([x0, x1, x2, x3], [y0, y1, y2, y3], h) {
-  /* prettier-ignore */
-  return [
-    // 1
-    x2, y0, 0,
-    x3, y0, 0,
-    x3, y1, 0,
-
-    // 2
-    x2, y0, 0,
-    x3, y1, 0,
-    x3, y3, h,
-
-    x0, y0, h,
-    x2, y0, 0,
-    x3, y3, h,
-
-    // 3
-    x0, y0, h,
-    x3, y3, h,
-    x2, y3, 0,
-
-    x0, y0, h,
-    x2, y3, 0,
-    x0, y1, 0,
-
-    // 4
-    x0, y1, 0,
-    x2, y3, 0,
-    x0, y3, 0,
-  ];
-}
-
-function rightToLeftTile([x0, x1, x2, x3], [y0, y1, y2, y3], h) {
+function tileOne([x0, x1, x2], [y0, y1, y2], h) {
   /* prettier-ignore */
   return [
     // 1
     x1, y0, h,
-    x0, y1, h,
-    x0, y0, 0,
+    x2, y0, 0,
+    x2, y1, h,
 
     // 2
+    x0, y0, 0,
     x1, y0, h,
-    x0, y3, 0,
+    x2, y1, h,
+
+    x0, y0, 0,
+    x2, y1, h,
+    x2, y2, 0,
+
+    // 3
+    x0, y0, 0,
+    x2, y2, 0,
+    x1, y2, h,
+
+    x0, y0, 0,
+    x1, y2, h,
     x0, y1, h,
 
-    x3, y0, 0,
-    x0, y3, 0,
+    // 4
+    x0, y1, h,
+    x1, y2, h,
+    x0, y2, 0,
+  ];
+}
+
+function tileTwo([x0, x1, x2, x3], [y0, y1, y2, y3], h) {
+  /* prettier-ignore */
+  return [
+    // 1
+    x0, y0, 0,
     x1, y0, h,
-
-    // 3
-    x2, y3, h,
-    x0, y3, 0,
-    x3, y0, 0,
-
-    x3, y0, 0,
-    x3, y2, h,
-    x2, y3, h,
-
-    // 4
-    x3, y3, 0,
-    x2, y3, h,
-    x3, y2, h,
-  ];
-}
-
-// Goes to the right and top
-function rightToLeftTileA([x0, x1, x2, x3], [y0, y1, y2, y3], h) {
-  /* prettier-ignore */
-  return [
-    // 1
-    x0, y0, 0,
-    x1, y0, 0,
-    x0, y1, 0,
+    x0, y1, h,
 
     // 2
-    x1, y0, 0,
-    x3, y0, h,
-    x0, y1, 0,
+    x0, y1, h,
+    x1, y0, h,
+    x0, y2, 0,
 
-    x0, y1, 0,
-    x3, y0, h,
-    x0, y3, h,
-
-    // 3
-    x0, y3, h,
-    x3, y0, h,
-    x3, y1, 0,
-
-    x0, y3, h,
-    x3, y1, 0,
-    x1, y3, 0,
-
-    // 4
-    x1, y3, 0,
-    x3, y1, 0,
-    x3, y3, 0,
-  ];
-}
-
-// Goes to the left and bottom
-function rightToLeftTileB([x0, x1, x2, x3], [y0, y1, y2, y3], h) {
-  /* prettier-ignore */
-  return [
-    // 1
-    x0, y0, 0,
+    x1, y0, h,
     x2, y0, 0,
     x0, y2, 0,
 
-    // 2
+    // 3
     x0, y2, 0,
     x2, y0, 0,
-    x3, y0, h,
+    x2, y1, h,
 
     x0, y2, 0,
-    x3, y0, h,
-    x0, y3, h,
-
-    // 3
-    x0, y3, h,
-    x3, y0, h,
-    x3, y2, 0,
-
-    x0, y3, h,
-    x3, y2, 0,
-    x2, y3, 0,
+    x2, y1, h,
+    x1, y2, h,
 
     // 4
-    x2, y3, 0,
-    x3, y2, 0,
-    x3, y3, 0,
+    x1, y2, h,
+    x2, y1, h,
+    x2, y2, 0,
   ];
 }
