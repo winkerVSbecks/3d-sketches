@@ -14,6 +14,7 @@ function clrs(minContrast = 3) {
 
   return {
     bg: background,
+    paper: () => Random.pick(paperColors),
     ink,
     inkColors,
   };
