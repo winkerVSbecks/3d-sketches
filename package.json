@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "canvas-sketch --output=renders --stream=gif --fps=24",
+    "mp4": "canvas-sketch --output=renders --stream --open",
     "test": "echo \"Error: no test specified\" && exit 1",
     "sketches:build": "sh build-sketches.sh",
     "app:build": "rollup -c",

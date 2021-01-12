@@ -16,7 +16,7 @@ require('three/examples/js/renderers/SVGRenderer');
 const canvasSketch = require('canvas-sketch');
 
 const settings = {
-  // dimensions: [1600, 1600],
+  dimensions: [1600, 1600],
   scaleToView: true,
   context: 'webgl',
 };

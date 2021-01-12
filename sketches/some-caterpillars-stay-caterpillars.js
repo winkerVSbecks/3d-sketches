@@ -10,7 +10,7 @@ const { GridHelper } = require('three');
 const clrs = require('../clrs')();
 
 const settings = {
-  // dimensions: [800, 800],
+  dimensions: [1600, 1600],
   animate: true,
   duration: 2,
   context: 'webgl',

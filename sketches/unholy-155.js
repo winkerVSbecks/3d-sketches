@@ -13,10 +13,10 @@ require('three/examples/js/controls/OrbitControls');
 const canvasSketch = require('canvas-sketch');
 
 const settings = {
-  // dimensions: [1600, 1200],
+  dimensions: [1600, 1200],
   scaleToView: true,
   animate: true,
-  duration: 10,
+  duration: 6,
   context: 'webgl',
 };
 

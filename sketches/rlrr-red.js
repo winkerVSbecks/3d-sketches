@@ -10,7 +10,7 @@ const Random = require('canvas-sketch-util/random');
 const clrs = require('../clrs')();
 
 const settings = {
-  // dimensions: [800, 800],
+  dimensions: [1600, 1600],
   // Make the loop animated
   animate: true,
   duration: 4,
@@ -204,6 +204,9 @@ function sculptureGeometry(
   heightSegments = 1
 ) {
   const geometry = new THREE.BufferGeometry();
+
+  const heightHalf = width / 2;
+  const widthHalf = height / 2;
 
   const gridX = Math.floor(widthSegments);
   const gridY = Math.floor(heightSegments);
