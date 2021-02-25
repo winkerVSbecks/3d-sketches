@@ -9,6 +9,7 @@ const { mapRange } = require('canvas-sketch-util/math');
 const canvasSketch = require('canvas-sketch');
 const packSpheres = require('pack-spheres');
 const glslify = require('glslify');
+const clrs = require('../clrs')();
 
 const settings = {
   scaleToView: true,
@@ -24,8 +25,10 @@ const sketch = ({ context }) => {
     canvas: context.canvas,
   });
 
-  const background = new THREE.Color('#120078'); // #413c69 // #fbaccc //#413c69 // #2a243c
-  const foreground = new THREE.Color('#fecd1a'); // #709fb0 // #f1d1d0 // #4a47a3
+  const background = new THREE.Color('#000000'); // #222
+  const water = new THREE.Color('#AAEBED'); //#62A8E5
+  const grass = new THREE.Color('#69E19D'); //#397E58
+  const land = new THREE.Color('#F7ED94'); //#BB8B41
 
   // WebGL background color
   renderer.setClearColor(background, 1);
@@ -43,70 +46,38 @@ const sketch = ({ context }) => {
 
   // Setup a geometry
   const geometry = new THREE.IcosahedronBufferGeometry(1, 3);
-  const baseGeometry = new THREE.IcosahedronGeometry(1, 1);
 
-  // For each face, provide the 3 neighbouring points to that face
-  const neighbourCount = 3;
-  addNeighbourAttributes(geometry, baseGeometry.vertices, neighbourCount);
-
-  const bounds = 1.5;
-  const spheres = packSpheres({
-    sample: () => Random.insideSphere(),
-    outside: (position, radius) => {
-      return (
-        new THREE.Vector3().fromArray(position).length() + radius >= bounds
-      );
+  // Setup a material
+  const material = new THREE.ShaderMaterial({
+    transparent: true,
+    extensions: {
+      derivatives: true,
     },
-    minRadius: () =>
-      Math.max(0.05, 0.05 + Math.min(1.0, Math.abs(Random.gaussian(0, 0.1)))),
-    maxCount: 20,
-    packAttempts: 4000,
-    bounds,
-    maxRadius: 1.5,
-    minRadius: 0.05,
-  });
-
-  const meshes = spheres.map((sphere) => {
-    const size = 0.5; // mapRange(sphere.radius, 0, 0.75, 0.4, 0.1);
-
-    // Setup a material
-    const material = new THREE.ShaderMaterial({
-      transparent: true,
-      extensions: {
-        derivatives: true,
-      },
-      uniforms: {
-        scale: { value: 1.0 },
-        size: { value: size },
-        density: { value: 1.5 },
-        background: { value: background },
-        foreground: { value: foreground },
-        time: { value: 0 },
-      },
-      vertexShader: /*glsl*/ `
+    uniforms: {
+      scale: { value: 1.0 },
+      size: { value: 0.1 },
+      density: { value: 3.0 },
+      background: { value: background },
+      water: { value: water },
+      grass: { value: grass },
+      land: { value: land },
+      time: { value: 0 },
+    },
+    vertexShader: /*glsl*/ `
       varying vec3 vPosition;
-      attribute vec3 neighbour0;
-      attribute vec3 neighbour1;
-      attribute vec3 neighbour2;
-      varying vec3 vNeighbour0;
-      varying vec3 vNeighbour1;
-      varying vec3 vNeighbour2;
 
       void main () {
         vPosition = position;
-
-        vNeighbour0 = neighbour0 - vPosition;
-        vNeighbour1 = neighbour1 - vPosition;
-        vNeighbour2 = neighbour2 - vPosition;
-
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
       `,
-      fragmentShader: glslify(/* glsl */ `
+    fragmentShader: glslify(/* glsl */ `
       precision highp float;
 
       varying vec3 vPosition;
-      uniform vec3 foreground;
+      uniform vec3 water;
+      uniform vec3 grass;
+      uniform vec3 land;
       uniform vec3 background;
 
       // For the noisy contours
@@ -134,10 +105,6 @@ const sketch = ({ context }) => {
       // For the sphere rim
       uniform mat4 modelMatrix;
 
-      varying vec3 vNeighbour0;
-      varying vec3 vNeighbour1;
-      varying vec3 vNeighbour2;
-
       float sphereRim (vec3 spherePosition) {
         vec3 normal = normalize(spherePosition.xyz);
         vec3 worldNormal = normalize(mat3(modelMatrix) * normal.xyz);
@@ -148,15 +115,6 @@ const sketch = ({ context }) => {
       }
 
       void main () {
-        // Find the smallest distance of the 3 neighbours
-        float d0 = dot(vNeighbour0, vNeighbour0);
-        float d1 = dot(vNeighbour1, vNeighbour1);
-        float d2 = dot(vNeighbour2, vNeighbour2);
-        float dist = sqrt(min(d0, min(d1, d2)));
-
-        // Use the first (closest) neighbour to create noise offsets
-        vec3 curNeighbour = vNeighbour0;
-
         // Contours
         vec3 p = vPosition * scale;
         float amp = 0.5;
@@ -167,41 +125,31 @@ const sketch = ({ context }) => {
         p *= 2.0;
         v /= size;
 
-        vec3 fragColor = background;
-        float t = patternZebra(v);
+        vec3 fragColor = water;
 
-        fragColor = mix(background, foreground, t);
-        // background color invisible
-        // fragColor = mix(background, foreground, t);
+        if (v > 0.333 && v < 0.666) {
+          fragColor = land;
+        } else if (v >= 0.666) {
+          fragColor = grass;
+        }
 
         float rim = sphereRim(vPosition);
-        fragColor += (1.0 - rim) * foreground * 0.25;
+        fragColor += (1.0 - rim) * background * 0.25;
 
         float stroke = aastep(0.9, rim);
         fragColor = mix(fragColor, background, stroke);
 
-        float alpha = 1.0;
-        if(v > 0.25) {
-          alpha = 0.0;
-        }
-
-        // background color invisible
-        // float alpha = t;
-
-        gl_FragColor = vec4(fragColor, alpha);
+        gl_FragColor = vec4(fragColor, 1.0);
       }
       `),
-    });
-
-    // Setup a mesh with geometry + material
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.fromArray(sphere.position);
-    mesh.scale.setScalar(sphere.radius);
-    mesh.quaternion.fromArray(Random.quaternion());
-    mesh.rotationSpeed = Random.rangeFloor(1, 2) * (Math.PI * 2);
-    scene.add(mesh);
-    return mesh;
   });
+
+  // Setup a mesh with geometry + material
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.fromArray([0, 0, 0]);
+  mesh.scale.setScalar(1);
+  mesh.quaternion.fromArray(Random.quaternion());
+  scene.add(mesh);
 
   // draw each frame
   return {
@@ -214,14 +162,10 @@ const sketch = ({ context }) => {
     },
     // Update & render your scene here
     render({ playhead, duration, deltaTime }) {
-      meshes.forEach((mesh) => {
-        // mesh.rotateOnWorldAxis(
-        //   new THREE.Vector3(0, 1, 0),
-        //   mesh.rotationSpeed / (duration * 60)
-        // );
-        mesh.material.uniforms.time.value = playhead;
-      });
-      // const omega = (Math.PI * 2) / (duration * 60);
+      mesh.material.uniforms.time.value = playhead;
+
+      const omega = (Math.PI * 2) / (duration * 60);
+      scene.rotation.y = playhead * Math.PI * 2;
       // scene.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), omega);
 
       controls.update();
