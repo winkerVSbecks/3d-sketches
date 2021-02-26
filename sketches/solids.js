@@ -12,11 +12,11 @@ const clrs = require('../clrs')();
 
 const settings = {
   scaleToView: true,
-  dimensions: [1440, 900],
+  dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 6,
-  fps: 60,
+  duration: 4,
+  fps: 50,
 };
 
 const sketch = ({ context }) => {
@@ -42,12 +42,8 @@ const sketch = ({ context }) => {
   const scene = new THREE.Scene();
 
   // Setup a geometry
-  const geometry = new THREE.IcosahedronBufferGeometry(1, 3);
-  const baseGeometry = new THREE.IcosahedronGeometry(1, 1);
-
-  // For each face, provide the 3 neighbouring points to that face
-  const neighbourCount = 3;
-  addNeighbourAttributes(geometry, baseGeometry.vertices, neighbourCount);
+  const geometry = new THREE.TorusGeometry(1, 0.5, 16, 100);
+  // const geometry = new THREE.IcosahedronBufferGeometry(1, 3);
 
   const bounds = 1.5;
   const spheres = packSpheres({
@@ -90,20 +86,11 @@ const sketch = ({ context }) => {
       },
       vertexShader: /*glsl*/ `
       varying vec3 vPosition;
-      attribute vec3 neighbour0;
-      attribute vec3 neighbour1;
-      attribute vec3 neighbour2;
-      varying vec3 vNeighbour0;
-      varying vec3 vNeighbour1;
-      varying vec3 vNeighbour2;
+      varying vec3 vNormal;
 
       void main () {
         vPosition = position;
-
-        vNeighbour0 = neighbour0 - vPosition;
-        vNeighbour1 = neighbour1 - vPosition;
-        vNeighbour2 = neighbour2 - vPosition;
-
+        vNormal = normal;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
       `,
@@ -111,6 +98,7 @@ const sketch = ({ context }) => {
       precision highp float;
 
       varying vec3 vPosition;
+      varying vec3 vNormal;
       uniform vec3 color1;
       uniform vec3 color2;
       uniform vec3 color3;
@@ -139,12 +127,8 @@ const sketch = ({ context }) => {
         return ((duration - current) * noise(vec4(v, current + offset)) + current * noise(vec4(v, current - duration + offset))) / duration;
       }
 
-      // For the sphere rim
+      // For the rim
       uniform mat4 modelMatrix;
-
-      varying vec3 vNeighbour0;
-      varying vec3 vNeighbour1;
-      varying vec3 vNeighbour2;
 
       float sphereRim (vec3 spherePosition) {
         vec3 normal = normalize(spherePosition.xyz);
@@ -155,17 +139,22 @@ const sketch = ({ context }) => {
         return pow(smoothstep(0.0, 1.0, rim), 0.5);
       }
 
+      float geometryRim (vec3 position) {
+        vec3 worldNormal = normalize(mat3(modelMatrix) * vNormal.xyz);
+        vec3 worldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+        vec3 V = normalize(cameraPosition - worldPosition);
+        float rim = 1.0 - max(0.75 -dot(V, worldNormal), 0.0);
+        return pow(smoothstep(0.0, 1.0, rim), 0.5);
+
+        // vec3 worldPosition = (modelMatrix * vec4( vPosition, 1.0 )).xyz;
+        // vec3 worldNormal = normalize(vec3(modelMatrix * vec4(vNormal, 0.0)));
+        // vec3 viewVector = normalize(cameraPosition - worldPosition);
+
+        // float rimndotv =  max(0.0, 1.0 - clamp(dot(worldNormal, viewVector), 0.0, 1.0));
+        // return pow(smoothstep(0.0, 1.0, rimndotv), 0.5);
+      }
+
       void main () {
-        // Find the smallest distance of the 3 neighbours
-        float d0 = dot(vNeighbour0, vNeighbour0);
-        float d1 = dot(vNeighbour1, vNeighbour1);
-        float d2 = dot(vNeighbour2, vNeighbour2);
-        float dist = sqrt(min(d0, min(d1, d2)));
-
-        // use the first (closest) neighbour to create noise offets
-        vec3 curNeighbour = vNeighbour0;
-
-
         // Contours
         vec3 p = vPosition * scale;
         float amp = 0.5;
@@ -187,7 +176,8 @@ const sketch = ({ context }) => {
           fragColor = mix(color3, color4, t);
         }
 
-        float rim = sphereRim(vPosition);
+        float rim = geometryRim(vPosition);
+        // float rim = sphereRim(vPosition);
         fragColor += (1.0 - rim) * color1 * 0.25;
 
         float stroke = aastep(0.9, rim);
@@ -220,15 +210,10 @@ const sketch = ({ context }) => {
     // Update & render your scene here
     render({ playhead, duration, deltaTime }) {
       meshes.forEach((mesh) => {
-        mesh.rotateOnWorldAxis(
-          new THREE.Vector3(0, 1, 0),
-          mesh.rotationSpeed / (duration * 60)
-        );
         mesh.material.uniforms.time.value = playhead;
       });
-      // const omega = (Math.PI * 2) / (duration * 60);
-      // scene.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), omega);
-      scene.rotation.y = playhead * Math.PI * 2;
+      const omega = (Math.PI * 2) / (duration * 60);
+      scene.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), omega);
 
       controls.update();
       renderer.render(scene, camera);
@@ -243,85 +228,85 @@ const sketch = ({ context }) => {
 
 canvasSketch(sketch, settings);
 
-function addNeighbourAttributes(
-  bufferGeometry,
-  baseVertices,
-  neighbourCount = 3
-) {
-  if (bufferGeometry.getIndex()) {
-    throw new Error(
-      'This is only supported on un-indexed geometries right now.'
-    );
-  }
+// function addNeighbourAttributes(
+//   bufferGeometry,
+//   baseVertices,
+//   neighbourCount = 3
+// ) {
+//   if (bufferGeometry.getIndex()) {
+//     throw new Error(
+//       'This is only supported on un-indexed geometries right now.'
+//     );
+//   }
 
-  // We will give each triangle in the geometry N nearest neighbours
-  const positionAttr = bufferGeometry.getAttribute('position');
-  const vertexCount = positionAttr.count;
+//   // We will give each triangle in the geometry N nearest neighbours
+//   const positionAttr = bufferGeometry.getAttribute('position');
+//   const vertexCount = positionAttr.count;
 
-  // First let's build a little list of attribute names + vertex data
-  const neighbourAttribs = [];
-  for (let i = 0; i < neighbourCount; i++) {
-    neighbourAttribs.push({
-      name: `neighbour${i}`,
-      data: [],
-    });
-  }
+//   // First let's build a little list of attribute names + vertex data
+//   const neighbourAttribs = [];
+//   for (let i = 0; i < neighbourCount; i++) {
+//     neighbourAttribs.push({
+//       name: `neighbour${i}`,
+//       data: [],
+//     });
+//   }
 
-  // For each triangle
-  for (let i = 0; i < vertexCount / 3; i++) {
-    // Get the triangle centroid, we will use that for comparison
-    const centroid = new THREE.Vector3();
-    for (let c = 0; c < 3; c++) {
-      const x = positionAttr.getX(i * 3 + c);
-      const y = positionAttr.getY(i * 3 + c);
-      const z = positionAttr.getZ(i * 3 + c);
-      const vert = new THREE.Vector3(x, y, z);
-      centroid.add(vert);
-    }
-    centroid.divideScalar(3);
+//   // For each triangle
+//   for (let i = 0; i < vertexCount / 3; i++) {
+//     // Get the triangle centroid, we will use that for comparison
+//     const centroid = new THREE.Vector3();
+//     for (let c = 0; c < 3; c++) {
+//       const x = positionAttr.getX(i * 3 + c);
+//       const y = positionAttr.getY(i * 3 + c);
+//       const z = positionAttr.getZ(i * 3 + c);
+//       const vert = new THREE.Vector3(x, y, z);
+//       centroid.add(vert);
+//     }
+//     centroid.divideScalar(3);
 
-    // Get the N nearest neighbours to the centroid
-    const neighbours = getNearestNeighbours(
-      centroid,
-      baseVertices,
-      neighbourCount
-    );
+//     // Get the N nearest neighbours to the centroid
+//     const neighbours = getNearestNeighbours(
+//       centroid,
+//       baseVertices,
+//       neighbourCount
+//     );
 
-    // Go through each neighbour and add its XYZ data in
-    neighbours.forEach((n, i) => {
-      // Repeat this 3 times so that we do it for each vertex
-      // in the triangle
-      for (let c = 0; c < 3; c++) {
-        neighbourAttribs[i].data.push(...n.toArray());
-      }
-    });
-  }
+//     // Go through each neighbour and add its XYZ data in
+//     neighbours.forEach((n, i) => {
+//       // Repeat this 3 times so that we do it for each vertex
+//       // in the triangle
+//       for (let c = 0; c < 3; c++) {
+//         neighbourAttribs[i].data.push(...n.toArray());
+//       }
+//     });
+//   }
 
-  // Now that we have flat arrays for each neighbour,
-  // we add it into the buffer geometry
-  neighbourAttribs.forEach((attrib) => {
-    const array = new Float32Array(attrib.data);
-    const buf = new THREE.BufferAttribute(array, 3);
-    bufferGeometry.addAttribute(attrib.name, buf);
-  });
-}
+//   // Now that we have flat arrays for each neighbour,
+//   // we add it into the buffer geometry
+//   neighbourAttribs.forEach((attrib) => {
+//     const array = new Float32Array(attrib.data);
+//     const buf = new THREE.BufferAttribute(array, 3);
+//     bufferGeometry.addAttribute(attrib.name, buf);
+//   });
+// }
 
-// a simple but inefficient method to extract N
-// nearest neighbours from a point with a given vertex list
-function getNearestNeighbours(point, list, count) {
-  // get distance squared from this point to all others
-  const data = list
-    // Avoid any that match the input point
-    .filter((p) => p.point !== point)
-    // Get an object with distance
-    .map((other) => {
-      return {
-        distance: point.distanceToSquared(other),
-        point: other,
-      };
-    });
-  // sort by distance
-  data.sort((a, b) => a.distance - b.distance);
-  // return only N neighbours
-  return data.slice(0, count).map((p) => p.point);
-}
+// // a simple but inefficient method to extract N
+// // nearest neighbours from a point with a given vertex list
+// function getNearestNeighbours(point, list, count) {
+//   // get distance squared from this point to all others
+//   const data = list
+//     // Avoid any that match the input point
+//     .filter((p) => p.point !== point)
+//     // Get an object with distance
+//     .map((other) => {
+//       return {
+//         distance: point.distanceToSquared(other),
+//         point: other,
+//       };
+//     });
+//   // sort by distance
+//   data.sort((a, b) => a.distance - b.distance);
+//   // return only N neighbours
+//   return data.slice(0, count).map((p) => p.point);
+// }
