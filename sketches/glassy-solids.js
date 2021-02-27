@@ -1,4 +1,3 @@
-import { Quaternion } from 'three';
 // Ensure ThreeJS is in global scope for the 'examples/'
 global.THREE = require('three');
 
@@ -9,6 +8,7 @@ const Random = require('canvas-sketch-util/random');
 const canvasSketch = require('canvas-sketch');
 const packSpheres = require('pack-spheres');
 const glslify = require('glslify');
+const clrs = require('../clrs')();
 
 const settings = {
   scaleToView: true,
@@ -25,7 +25,7 @@ const sketch = ({ context }) => {
     canvas: context.canvas,
   });
 
-  const background = '#222';
+  const background = new THREE.Color(clrs.bg);
 
   // WebGL background color
   renderer.setClearColor(background, 1);
@@ -41,31 +41,34 @@ const sketch = ({ context }) => {
   // Setup your scene
   const scene = new THREE.Scene();
 
-  const solids = [
-    {
-      position: [-0.5, -0.5, 0],
-      radius: 0.8,
-      geometry: new THREE.TorusGeometry(1, 0.5, 16, 100),
-      quaternion: Random.quaternion(),
-      mode: 1,
-    },
-    {
-      position: [-2, -2, 4],
-      radius: 2,
-      geometry: new THREE.IcosahedronBufferGeometry(1, 3),
-      mode: 1,
-    },
-    {
-      position: [0.6, 0, 2],
-      radius: 2,
-      geometry: new THREE.ConeGeometry(0.5, 1, 32),
-      mode: 0,
-    },
-  ];
+  // Setup a geometry
+  const geometry1 = new THREE.TorusGeometry(1, 0.5, 16, 100);
+  const geometry2 = new THREE.IcosahedronBufferGeometry(1, 3);
+  const geometry3 = new THREE.ConeGeometry(0.5, 1, 32);
+  // const geometry = new THREE.IcosahedronBufferGeometry(1, 3);
 
-  const meshes = solids.map((solid) => {
-    const primary = '#eee';
-    const secondary = '#ffa';
+  const bounds = 1.5;
+  const spheres = packSpheres({
+    sample: () => Random.insideSphere(),
+    outside: (position, radius) => {
+      return (
+        new THREE.Vector3().fromArray(position).length() + radius >= bounds
+      );
+    },
+    minRadius: () =>
+      Math.max(0.05, 0.05 + Math.min(1.0, Math.abs(Random.gaussian(0, 0.1)))),
+    maxCount: 20,
+    packAttempts: 4000,
+    bounds,
+    maxRadius: 1.5,
+    minRadius: 0.05,
+  });
+
+  const meshes = spheres.map((sphere) => {
+    const color1 = clrs.ink();
+    const color2 = clrs.ink();
+    const color3 = clrs.ink();
+    const color4 = clrs.ink();
 
     // Setup a material
     const material = new THREE.ShaderMaterial({
@@ -76,12 +79,13 @@ const sketch = ({ context }) => {
       },
       uniforms: {
         scale: { value: 1.0 },
-        size: { value: 1.0 },
-        density: { value: 1.0 },
-        mode: { value: solid.mode },
+        size: { value: 0.5 },
+        density: { value: 2.0 },
         background: { value: new THREE.Color(background) },
-        primary: { value: new THREE.Color(primary) },
-        secondary: { value: new THREE.Color(secondary) },
+        color1: { value: new THREE.Color(color1) },
+        color2: { value: new THREE.Color(color2) },
+        color3: { value: new THREE.Color(color3) },
+        color4: { value: new THREE.Color(color4) },
         time: { value: 0 },
       },
       vertexShader: /*glsl*/ `
@@ -99,10 +103,11 @@ const sketch = ({ context }) => {
 
       varying vec3 vPosition;
       varying vec3 vNormal;
-      uniform vec3 primary;
-      uniform vec3 secondary;
+      uniform vec3 color1;
+      uniform vec3 color2;
+      uniform vec3 color3;
+      uniform vec3 color4;
       uniform vec3 background;
-      uniform int mode;
 
       // For the noisy contours
       #pragma glslify: aastep = require('glsl-aastep');
@@ -114,12 +119,6 @@ const sketch = ({ context }) => {
       uniform float size;
       uniform float density;
 
-      float patternZebra(float v){
-        float d = 1.0 / density;
-        float s = -cos(v / d * PI * 2.);
-        return smoothstep(.0, .1 * d, .1 * s / fwidth(s));
-      }
-
       float loopNoise (vec3 v, float t, float scale, float offset) {
         float duration = scale;
         float current = t * scale;
@@ -129,20 +128,19 @@ const sketch = ({ context }) => {
       // For the rim
       uniform mat4 modelMatrix;
 
-      float sphereRim (vec3 spherePosition) {
-        vec3 normal = normalize(spherePosition.xyz);
-        vec3 worldNormal = normalize(mat3(modelMatrix) * normal.xyz);
-        vec3 worldPosition = (modelMatrix * vec4(spherePosition, 1.0)).xyz;
-        vec3 V = normalize(cameraPosition - worldPosition);
-        float rim = 1.0 - max(dot(V, worldNormal), 0.0);
-        return pow(smoothstep(0.0, 1.0, rim), 0.5);
-      }
-
       float geometryRim (vec3 position) {
         vec3 worldNormal = normalize(mat3(modelMatrix) * vNormal.xyz);
         vec3 worldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
         vec3 V = normalize(cameraPosition - worldPosition);
         float rim = 1.0 - max(dot(V, worldNormal), 0.0);
+        return pow(smoothstep(0.0, 1.0, rim), 0.5);
+      }
+
+      float innerRim (vec3 position) {
+        vec3 worldNormal = normalize(mat3(modelMatrix) * vNormal.xyz);
+        vec3 worldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+        vec3 V = normalize(cameraPosition - worldPosition);
+        float rim = 1.0 - max(0.7 - dot(V, worldNormal), 0.0);
         return pow(smoothstep(0.0, 1.0, rim), 0.5);
       }
 
@@ -158,28 +156,27 @@ const sketch = ({ context }) => {
         v /= size;
 
         vec3 fragColor = background;
-        float t = patternZebra(v);
 
-        fragColor = mix(primary, background, t);
-
-        // fragColor = primary;
+        fragColor = color1;
 
         float rim = geometryRim(vPosition);
-        fragColor += (1.0 - rim) * background * 0.25;
+        fragColor += (1.0 - rim) * color2 * 0.25;
 
         float stroke = aastep(0.85, rim);
         fragColor = mix(fragColor, background, stroke);
 
         stroke = aastep(0.95, rim);
-        fragColor = mix(fragColor, primary, stroke);
+        fragColor = mix(fragColor, color1, stroke);
+
+        // gloss effect
+        // rim = innerRim(vPosition);
+        // float fill = aastep(0.9999, rim);
+        // fragColor = mix(fragColor, background, fill);
 
         float alpha = 1.0;
-        if(v > 0.1) {
-          if (mode==1) {
-            fragColor = background;
-          } else {
-            alpha = 0.0;
-          }
+        if(v > 0.25) {
+          fragColor = color1;
+          // alpha = 0.0;
         }
 
         gl_FragColor = vec4(fragColor, alpha);
@@ -188,13 +185,11 @@ const sketch = ({ context }) => {
     });
 
     // Setup a mesh with geometry + material
-    const geometry = solid.geometry;
+    const geometry = Random.pick([geometry1, geometry2, geometry3]);
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.fromArray(solid.position);
-    mesh.scale.setScalar(solid.radius);
-    if (solid.quaternion) {
-      mesh.quaternion.fromArray(solid.quaternion);
-    }
+    mesh.position.fromArray(sphere.position);
+    mesh.scale.setScalar(sphere.radius);
+    mesh.quaternion.fromArray(Random.quaternion());
     scene.add(mesh);
     return mesh;
   });
@@ -213,7 +208,7 @@ const sketch = ({ context }) => {
       meshes.forEach((mesh) => {
         mesh.material.uniforms.time.value = playhead;
       });
-      // scene.rotation.y = playhead * Math.PI * 2;
+      scene.rotation.y = playhead * Math.PI * 2;
 
       controls.update();
       renderer.render(scene, camera);
