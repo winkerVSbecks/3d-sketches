@@ -25,7 +25,7 @@ const sketch = ({ context }) => {
     canvas: context.canvas,
   });
 
-  const background = '#222';
+  const background = '#fff';
 
   // WebGL background color
   renderer.setClearColor(background, 1);
@@ -53,6 +53,7 @@ const sketch = ({ context }) => {
       position: [-2, -2, 4],
       radius: 2,
       geometry: new THREE.IcosahedronBufferGeometry(1, 3),
+      quaternion: Random.quaternion(),
       mode: 1,
     },
     {
@@ -64,8 +65,7 @@ const sketch = ({ context }) => {
   ];
 
   const meshes = solids.map((solid) => {
-    const primary = '#eee';
-    const secondary = '#ffa';
+    const primary = '#000';
 
     // Setup a material
     const material = new THREE.ShaderMaterial({
@@ -81,7 +81,6 @@ const sketch = ({ context }) => {
         mode: { value: solid.mode },
         background: { value: new THREE.Color(background) },
         primary: { value: new THREE.Color(primary) },
-        secondary: { value: new THREE.Color(secondary) },
         time: { value: 0 },
       },
       vertexShader: /*glsl*/ `
@@ -100,7 +99,6 @@ const sketch = ({ context }) => {
       varying vec3 vPosition;
       varying vec3 vNormal;
       uniform vec3 primary;
-      uniform vec3 secondary;
       uniform vec3 background;
       uniform int mode;
 
@@ -129,20 +127,19 @@ const sketch = ({ context }) => {
       // For the rim
       uniform mat4 modelMatrix;
 
-      float sphereRim (vec3 spherePosition) {
-        vec3 normal = normalize(spherePosition.xyz);
-        vec3 worldNormal = normalize(mat3(modelMatrix) * normal.xyz);
-        vec3 worldPosition = (modelMatrix * vec4(spherePosition, 1.0)).xyz;
-        vec3 V = normalize(cameraPosition - worldPosition);
-        float rim = 1.0 - max(dot(V, worldNormal), 0.0);
-        return pow(smoothstep(0.0, 1.0, rim), 0.5);
-      }
-
       float geometryRim (vec3 position) {
         vec3 worldNormal = normalize(mat3(modelMatrix) * vNormal.xyz);
         vec3 worldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
         vec3 V = normalize(cameraPosition - worldPosition);
         float rim = 1.0 - max(dot(V, worldNormal), 0.0);
+        return pow(smoothstep(0.0, 1.0, rim), 0.5);
+      }
+
+      float innerRim (vec3 position) {
+        vec3 worldNormal = normalize(mat3(modelMatrix) * vNormal.xyz);
+        vec3 worldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+        vec3 V = normalize(cameraPosition - worldPosition);
+        float rim = 1.0 - max(0.7 - dot(V, worldNormal), 0.0);
         return pow(smoothstep(0.0, 1.0, rim), 0.5);
       }
 
@@ -160,9 +157,9 @@ const sketch = ({ context }) => {
         vec3 fragColor = background;
         float t = patternZebra(v);
 
-        fragColor = mix(primary, background, t);
+        // fragColor = mix(primary, background, t);
 
-        // fragColor = primary;
+        fragColor = primary;
 
         float rim = geometryRim(vPosition);
         fragColor += (1.0 - rim) * background * 0.25;
@@ -173,10 +170,15 @@ const sketch = ({ context }) => {
         stroke = aastep(0.95, rim);
         fragColor = mix(fragColor, primary, stroke);
 
+        // gloss effect
+        rim = innerRim(vPosition);
+        float fill = aastep(0.9999, rim);
+        fragColor = mix(fragColor, mix(primary, background, fill), 0.125);
+
         float alpha = 1.0;
         if(v > 0.1) {
           if (mode==1) {
-            fragColor = background;
+            // fragColor = background;
           } else {
             alpha = 0.0;
           }
