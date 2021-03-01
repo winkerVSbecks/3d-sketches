@@ -29,7 +29,7 @@
     "query-string": "^6.13.1",
     "riso-colors": "^1.0.1",
     "sirv-cli": "^0.4.4",
-    "three": "^0.117.1",
+    "three": "^0.125.0",
     "three.meshline": "^1.2.0"
   },
   "devDependencies": {
