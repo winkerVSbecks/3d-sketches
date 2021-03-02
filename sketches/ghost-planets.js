@@ -45,10 +45,6 @@ const sketch = ({ context }) => {
   const geometry = new THREE.IcosahedronBufferGeometry(1, 3);
   const baseGeometry = new THREE.IcosahedronGeometry(1, 1);
 
-  // For each face, provide the 3 neighbouring points to that face
-  const neighbourCount = 3;
-  addNeighbourAttributes(geometry, baseGeometry.vertices, neighbourCount);
-
   const bounds = 1.5;
   const spheres = packSpheres({
     sample: () => Random.insideSphere(),
@@ -134,10 +130,6 @@ const sketch = ({ context }) => {
       // For the sphere rim
       uniform mat4 modelMatrix;
 
-      varying vec3 vNeighbour0;
-      varying vec3 vNeighbour1;
-      varying vec3 vNeighbour2;
-
       float sphereRim (vec3 spherePosition) {
         vec3 normal = normalize(spherePosition.xyz);
         vec3 worldNormal = normalize(mat3(modelMatrix) * normal.xyz);
@@ -148,15 +140,6 @@ const sketch = ({ context }) => {
       }
 
       void main () {
-        // Find the smallest distance of the 3 neighbours
-        float d0 = dot(vNeighbour0, vNeighbour0);
-        float d1 = dot(vNeighbour1, vNeighbour1);
-        float d2 = dot(vNeighbour2, vNeighbour2);
-        float dist = sqrt(min(d0, min(d1, d2)));
-
-        // Use the first (closest) neighbour to create noise offsets
-        vec3 curNeighbour = vNeighbour0;
-
         // Contours
         vec3 p = vPosition * scale;
         float amp = 0.5;
@@ -236,86 +219,3 @@ const sketch = ({ context }) => {
 };
 
 canvasSketch(sketch, settings);
-
-function addNeighbourAttributes(
-  bufferGeometry,
-  baseVertices,
-  neighbourCount = 3
-) {
-  if (bufferGeometry.getIndex()) {
-    throw new Error(
-      'This is only supported on un-indexed geometries right now.'
-    );
-  }
-
-  // We will give each triangle in the geometry N nearest neighbours
-  const positionAttr = bufferGeometry.getAttribute('position');
-  const vertexCount = positionAttr.count;
-
-  // First let's build a little list of attribute names + vertex data
-  const neighbourAttribs = [];
-  for (let i = 0; i < neighbourCount; i++) {
-    neighbourAttribs.push({
-      name: `neighbour${i}`,
-      data: [],
-    });
-  }
-
-  // For each triangle
-  for (let i = 0; i < vertexCount / 3; i++) {
-    // Get the triangle centroid, we will use that for comparison
-    const centroid = new THREE.Vector3();
-    for (let c = 0; c < 3; c++) {
-      const x = positionAttr.getX(i * 3 + c);
-      const y = positionAttr.getY(i * 3 + c);
-      const z = positionAttr.getZ(i * 3 + c);
-      const vert = new THREE.Vector3(x, y, z);
-      centroid.add(vert);
-    }
-    centroid.divideScalar(3);
-
-    // Get the N nearest neighbours to the centroid
-    const neighbours = getNearestNeighbours(
-      centroid,
-      baseVertices,
-      neighbourCount
-    );
-
-    // Go through each neighbour and add its XYZ data in
-    neighbours.forEach((n, i) => {
-      // Repeat this 3 times so that we do it for each vertex
-      // in the triangle
-      for (let c = 0; c < 3; c++) {
-        neighbourAttribs[i].data.push(...n.toArray());
-      }
-    });
-  }
-
-  // Now that we have flat arrays for each neighbour,
-  // we add it into the buffer geometry
-  neighbourAttribs.forEach((attrib) => {
-    const array = new Float32Array(attrib.data);
-    const buf = new THREE.BufferAttribute(array, 3);
-    bufferGeometry.addAttribute(attrib.name, buf);
-  });
-}
-
-// a simple but inefficient method to extract N
-// nearest neighbours from a point with a given vertex list
-function getNearestNeighbours(point, list, count) {
-  // get distance squared from this point to all others
-  const data = list
-    // Avoid any that match the input point
-    .filter((p) => p.point !== point)
-    // Get an object with distance
-    .map((other) => {
-      return {
-        distance: point.distanceToSquared(other),
-        point: other,
-      };
-    });
-  // sort by distance
-  data.sort((a, b) => a.distance - b.distance);
-  // return only N neighbours
-  return data.slice(0, count).map((p) => p.point);
-}
