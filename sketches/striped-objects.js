@@ -1,4 +1,3 @@
-import { Quaternion } from 'three';
 // Ensure ThreeJS is in global scope for the 'examples/'
 global.THREE = require('three');
 
@@ -26,8 +25,7 @@ const sketch = ({ context }) => {
     canvas: context.canvas,
   });
 
-  const background = '#FFF2F3';
-  const highlight = '#FFE2C3';
+  const background = new THREE.Color(clrs.bg);
 
   // WebGL background color
   renderer.setClearColor(background, 1);
@@ -43,56 +41,33 @@ const sketch = ({ context }) => {
   // Setup your scene
   const scene = new THREE.Scene();
 
-  // const color1 = '#FFA6B3';
-  // const color2 = '#1936FF';
+  // Setup a geometry
+  const geometry1 = new THREE.TorusGeometry(1, 0.5, 16, 100);
+  const geometry2 = new THREE.IcosahedronBufferGeometry(1, 3);
+  const geometry3 = new THREE.ConeGeometry(0.5, 1, 32);
+  // const geometry = new THREE.IcosahedronBufferGeometry(1, 3);
 
-  const solids = [
-    {
-      position: [-0.5, -0.5, 0],
-      radius: 0.8,
-      geometry: new THREE.TorusGeometry(1, 0.5, 16, 100),
-      quaternion: [
-        -0.04823637856952832,
-        -0.8274726548561598,
-        0.5594026425265238,
-        0.005562443899742685,
-      ],
-      mode: 1,
-      color1: '#FFD64B',
-      color2: '#FF8758',
-      tiling: 6,
-      direction: 0,
-      warpScale: 0.75,
-      warpTiling: 1,
+  const bounds = 1.5;
+  const spheres = packSpheres({
+    sample: () => Random.insideSphere(),
+    outside: (position, radius) => {
+      return (
+        new THREE.Vector3().fromArray(position).length() + radius >= bounds
+      );
     },
-    {
-      position: [-2, -2, 4],
-      radius: 2,
-      geometry: new THREE.IcosahedronBufferGeometry(1, 3),
-      quaternion: Random.quaternion(),
-      mode: 1,
-      color1: '#FF311C',
-      color2: '#FFA261',
-      tiling: 4,
-      direction: 0,
-      warpScale: 0.125,
-      warpTiling: 1,
-    },
-    {
-      position: [0.6, 0, 2],
-      radius: 2,
-      geometry: new THREE.ConeGeometry(0.5, 1, 32),
-      mode: 0,
-      color1: '#FFA6B3',
-      color2: '#1936FF',
-      tiling: 5,
-      direction: 0.25,
-      warpScale: 0.25,
-      warpTiling: 6,
-    },
-  ];
+    minRadius: () =>
+      Math.max(0.05, 0.05 + Math.min(1.0, Math.abs(Random.gaussian(0, 0.1)))),
+    maxCount: 20,
+    packAttempts: 4000,
+    bounds,
+    maxRadius: 1.5,
+    minRadius: 0.05,
+  });
 
-  const meshes = solids.map((solid) => {
+  const meshes = spheres.map((sphere) => {
+    const color1 = clrs.ink();
+    const color2 = clrs.ink();
+
     // Setup a material
     const material = new THREE.ShaderMaterial({
       side: THREE.DoubleSide,
@@ -101,27 +76,21 @@ const sketch = ({ context }) => {
         derivatives: true,
       },
       uniforms: {
-        color1: { value: new THREE.Color(solid.color1) },
-        color2: { value: new THREE.Color(solid.color2) },
-        background: { value: new THREE.Color(background) },
-        highlight: { value: new THREE.Color(highlight) },
+        color1: { value: new THREE.Color(color1) },
+        color2: { value: new THREE.Color(color2) },
         playhead: { value: 0 },
-        tiling: { value: solid.tiling },
-        direction: { value: solid.direction },
-        warpScale: { value: solid.warpScale },
-        warpTiling: { value: solid.warpTiling },
+        tiling: { value: Random.rangeFloor(1, 10) }, // { value: 10.0 }, // 1-500
+        direction: { value: Random.range(0, 1) }, // { value: 0.5 }, // 0-1
+        warpScale: { value: Random.range(0, 1) }, // { value: 0.0 }, // 0-1
+        warpTiling: { value: Random.rangeFloor(0, 10) }, // { value: 2.0 }, // 1-10
       },
       vertexShader: glslify(/*glsl*/ `
-        varying vec2 vUv;
-        varying vec3 vPosition;
-        varying vec3 vNormal;
+      varying vec2 vUv;
 
-        void main () {
-          vUv = uv;
-          vPosition = position;
-          vNormal = normal;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
+      void main () {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
       `),
       fragmentShader: glslify(/* glsl */ `
         // precision highp float;
@@ -132,26 +101,10 @@ const sketch = ({ context }) => {
         uniform float warpTiling;
         uniform vec3 color1;
         uniform vec3 color2;
-        uniform vec3 background;
-        uniform vec3 highlight;
 
         varying vec2 vUv;
 
         #define PI 3.141592653589793
-        #pragma glslify: aastep = require('glsl-aastep');
-
-        // For the rim
-        varying vec3 vPosition;
-        varying vec3 vNormal;
-        uniform mat4 modelMatrix;
-
-        float geometryRim (vec3 position) {
-          vec3 worldNormal = normalize(mat3(modelMatrix) * vNormal.xyz);
-          vec3 worldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
-          vec3 V = normalize(cameraPosition - worldPosition);
-          float rim = 1.0 - max(dot(V, worldNormal), 0.0);
-          return pow(smoothstep(0.0, 1.0, rim), 0.5);
-        }
 
         void main() {
           vec2 pos;
@@ -165,23 +118,17 @@ const sketch = ({ context }) => {
           float value = floor(fract(pos.x) + 0.5);
           vec3 color = mix(color1, color2, value);
 
-          float rim = geometryRim(vPosition);
-          float stroke = aastep(0.92, rim);
-          color = mix(color, highlight, stroke);
-
           gl_FragColor = vec4(color, 1.0);
         }
       `),
     });
 
     // Setup a mesh with geometry + material
-    const geometry = solid.geometry;
+    const geometry = Random.pick([geometry1, geometry2, geometry3]);
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.fromArray(solid.position);
-    mesh.scale.setScalar(solid.radius);
-    if (solid.quaternion) {
-      mesh.quaternion.fromArray(solid.quaternion);
-    }
+    mesh.position.fromArray(sphere.position);
+    mesh.scale.setScalar(sphere.radius);
+    mesh.quaternion.fromArray(Random.quaternion());
     scene.add(mesh);
     return mesh;
   });
@@ -200,7 +147,7 @@ const sketch = ({ context }) => {
       meshes.forEach((mesh) => {
         mesh.material.uniforms.playhead.value = playhead;
       });
-      // scene.rotation.y = playhead * Math.PI * 2;
+      scene.rotation.y = playhead * Math.PI * 2;
 
       controls.update();
       renderer.render(scene, camera);

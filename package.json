@@ -23,6 +23,8 @@
     "canvas-sketch-util": "^1.10.0",
     "delaunay-triangulate": "^1.1.6",
     "glsl-aastep": "^1.0.1",
+    "glsl-blend-soft-light": "^1.0.5",
+    "glsl-film-grain": "^1.0.4",
     "glsl-noise": "^0.0.0",
     "load-asset": "^1.2.0",
     "pack-spheres": "^1.0.4",

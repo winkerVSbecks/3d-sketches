@@ -57,10 +57,10 @@ const sketch = ({ gl }) => {
     frag,
     // Specify additional uniforms to pass down to the shaders
     uniforms: {
-      tiling: 10, // 1-500
-      direction: 0.5, // 0-1
-      warpScale: 0.1, // 0-1
-      warpTiling: 2, // 1-10
+      tiling: 10, //tiling: 10, // 1-500
+      direction: 0.5, //direction: 0.5, // 0-1
+      warpScale: 0, //warpScale: 0.1, // 0-1
+      warpTiling: 0, //warpTiling: 2, // 1-10
     },
   });
 };
