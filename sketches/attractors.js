@@ -7,7 +7,6 @@ require('three/examples/js/controls/OrbitControls');
 
 const Random = require('canvas-sketch-util/random');
 const canvasSketch = require('canvas-sketch');
-const glslify = require('glslify');
 
 const settings = {
   scaleToView: true,
@@ -18,7 +17,7 @@ const settings = {
   fps: 50,
 };
 
-const sketch = ({ context, width, height }) => {
+const sketch = ({ context }) => {
   // Create a renderer
   const renderer = new THREE.WebGLRenderer({
     canvas: context.canvas,
@@ -41,7 +40,7 @@ const sketch = ({ context, width, height }) => {
   const scene = new THREE.Scene();
 
   let attractor;
-  const scale = 1.25;
+  const scale = 1.125;
   const PARTICLE_COUNT = 10000;
 
   const geometry = new THREE.BufferGeometry();
@@ -62,7 +61,7 @@ const sketch = ({ context, width, height }) => {
   );
 
   const material = new THREE.PointsMaterial({
-    color: '#ffd600', // 'rgba(255, 255, 255, 0.5)',
+    color: 'rgba(255, 255, 255, 0.5)',
     size: 0.01,
     sizeAttenuation: true,
     transparent: true,
@@ -72,9 +71,6 @@ const sketch = ({ context, width, height }) => {
   attractor.position.set(0, 0, 0);
   attractor.frustumCulled = false;
   scene.add(attractor);
-
-  const planet = silkyPlanet(width, height);
-  scene.add(planet);
 
   return {
     resize({ pixelRatio, viewportWidth, viewportHeight }) {
@@ -87,14 +83,7 @@ const sketch = ({ context, width, height }) => {
       const geometry = attractor.geometry;
       updatePosition(geometry, scale);
 
-      planet.material.uniforms.u_time.value = Math.sin(Math.PI * 2 * playhead);
-      planet.material.uniforms.u_scale.value =
-        1 + 6 * Math.abs(Math.sin(Math.PI * 2 * playhead));
-
-      // attractor.rotation.z += 0.001;
-
-      // const omega = (Math.PI * 2) / (duration * 60);
-      // scene.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), omega);
+      attractor.rotation.z += 0.001;
 
       controls.update();
       renderer.render(scene, camera);
@@ -151,6 +140,9 @@ function dadrasAttractor([x, y, z], timestep) {
   return [dx, dy, dz];
 }
 
+/**
+ * https://fusefactory.github.io/openfuse/strange%20attractors/particle%20system/Strange-Attractors-GPU/
+ */
 function dequanAttractor([x, y, z], timestep) {
   const a = 40.0;
   const b = 1.833;
@@ -189,85 +181,4 @@ function lorenzMod2Attractor([x, y, z], timestep) {
   const dz = (-z + x * (b * y + z)) * timestep;
 
   return [dx, dy, dz];
-}
-
-function silkyPlanet(width, height) {
-  const geometry = new THREE.IcosahedronBufferGeometry(1, 10);
-
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      u_time: { value: 0 },
-      u_resolution: { value: [width, height] },
-      u_scale: { value: 1 },
-    },
-    vertexShader: /*glsl*/ `
-      precision highp float;
-      varying vec2 vUv;
-      varying vec3 vPosition;
-
-      void main () {
-        vPosition = position;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        // vUv = uv;
-        vUv = position.xy * 0.5 + 0.5;
-      }
-    `,
-    fragmentShader: glslify(/* glsl */ `
-      #ifdef GL_ES
-      precision mediump float;
-      #endif
-
-      #pragma glslify: noise = require(glsl-noise/simplex/4d);
-      #pragma glslify: grain = require(glsl-film-grain);
-      #pragma glslify: blend = require('glsl-blend-soft-light');
-      #define gold vec3(1.0, 0.843, 0.0)
-
-      uniform vec2 u_resolution;
-      uniform float u_time;
-      uniform float u_scale;
-
-      varying vec3 vPosition;
-      varying vec2 vUv;
-
-      const int AMOUNT = 4;
-
-      float loopNoise (vec3 v, float t, float scale, float offset) {
-        float duration = scale;
-        float current = t * scale;
-        return ((duration - current) * noise(vec4(v, current + offset)) + current * noise(vec4(v, current - duration + offset))) / duration;
-      }
-
-      void main(){
-        vec2 coord = 20.0 * vUv;
-
-        vec3 p = vPosition * 1.0;
-        float v = 0.0;
-        float amp = 0.5;
-        v += loopNoise(p, u_time, 1.0, 60.0) * amp;
-
-        float len;
-
-        for (int i = 0; i < AMOUNT; i++){
-          len = length(vec2(coord.x, coord.y));
-          coord.x = coord.x - cos(coord.y + sin(len)) + cos(u_time / 9.0);
-          coord.y = coord.y + sin(coord.x + cos(len)) + sin(u_time / 12.0);
-        }
-
-        len += v * u_scale;
-        vec3 color = vec3(cos(len), cos(len), cos(len));
-
-        float grainSize = 1.0;
-        float g = grain(vUv, u_resolution / grainSize);
-        vec3 noiseColor = blend(vec3(g), gold);
-        color = blend(color, noiseColor);
-
-        gl_FragColor = vec4(color, 1.0);
-      }
-    `),
-  });
-
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.fromArray([0, 0, 0]);
-  mesh.quaternion.fromArray(Random.quaternion());
-  return mesh;
 }
