@@ -15,8 +15,8 @@ const settings = {
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 12,
-  // fps: 50,
+  duration: 8,
+  fps: 50,
 };
 
 const sketch = ({ context, width, height }) => {
@@ -25,7 +25,7 @@ const sketch = ({ context, width, height }) => {
     canvas: context.canvas,
   });
 
-  const background = '#FEFFF9';
+  const background = '#222';
 
   // WebGL background color
   renderer.setClearColor(background, 1);
@@ -41,71 +41,44 @@ const sketch = ({ context, width, height }) => {
   // Setup your scene
   const scene = new THREE.Scene();
 
-  const planetScale = 0.5;
-  const scale = 1;
+  const planetScale = 0.9;
+  const scale = 1.25;
   const PARTICLE_COUNT = 10000;
 
   const attractors = new THREE.Group();
 
   const baseAttractor = createAttractor(
     PARTICLE_COUNT,
-    '#866E63',
+    '#88ff88',
     background,
     width,
     height
   );
-  baseAttractor._scale = 0.75 * scale;
-  baseAttractor.simulation = lorenzMod2Attractor;
+  baseAttractor.simulation = aizawaAttractor;
   baseAttractor.timeStep = 0.005;
   attractors.add(baseAttractor);
 
   const mainAttractor = createAttractor(
     PARTICLE_COUNT,
-    '#9D9676',
+    '#168FF9',
     background,
     width,
     height
   );
-  mainAttractor._scale = 0.9 * scale;
-  mainAttractor.simulation = dadrasAttractor;
+  mainAttractor.simulation = lorenzMod2Attractor;
   mainAttractor.timeStep = 0.001;
   attractors.add(mainAttractor);
 
   const secondaryAttractor = createAttractor(
     PARTICLE_COUNT,
-    '#d8ccb5',
+    '#6CF4F8',
     background,
     width,
     height
   );
-  secondaryAttractor._scale = scale;
   secondaryAttractor.simulation = dequanAttractor;
   secondaryAttractor.timeStep = 0.001;
   attractors.add(secondaryAttractor);
-
-  const tertiaryAttractor = createAttractor(
-    PARTICLE_COUNT,
-    '#d8ccb5',
-    background,
-    width,
-    height
-  );
-  tertiaryAttractor._scale = 1.25 * scale;
-  tertiaryAttractor.simulation = lorenzMod2Attractor;
-  tertiaryAttractor.timeStep = 0.001;
-  attractors.add(tertiaryAttractor);
-
-  const quadAttractor = createAttractor(
-    PARTICLE_COUNT,
-    '#666',
-    background,
-    width,
-    height
-  );
-  quadAttractor._scale = scale; // 1.5 * scale;
-  quadAttractor.simulation = arneodoAttractor;
-  quadAttractor.timeStep = 0.005;
-  attractors.add(quadAttractor);
 
   scene.add(attractors);
 
@@ -119,10 +92,10 @@ const sketch = ({ context, width, height }) => {
       camera.aspect = viewportWidth / viewportHeight;
       camera.updateProjectionMatrix();
     },
-    render({ playhead, time, deltaTime }) {
+    render({ playhead, duration, deltaTime }) {
       attractors.children.forEach((attractor) => {
         updateAttractor(
-          attractor._scale,
+          scale,
           attractor.geometry,
           attractor.simulation,
           attractor.timeStep
@@ -131,29 +104,23 @@ const sketch = ({ context, width, height }) => {
           Math.PI * 2 * playhead
         );
 
-        // attractor.material.uniforms.u_opacity.value = lerpFrames(
-        //   [0, 0.8, 0.8, 0.8, 0],
-        //   playhead
-        // );
+        attractor.material.uniforms.u_opacity.value = lerpFrames(
+          [0, 0.8, 0.8, 0.8, 0],
+          playhead
+        );
       });
 
-      const rotation = playhead * 2 * Math.PI;
-
-      attractors.rotation.y = Math.cos(rotation);
-      attractors.rotation.x = Math.sin(rotation);
-      attractors.rotation.z = Math.cos(rotation);
+      attractors.rotation.y = Math.cos(playhead * 2 * Math.PI);
+      attractors.rotation.x = Math.sin(playhead * 2 * Math.PI);
+      attractors.rotation.z = Math.cos(playhead * 2 * Math.PI);
 
       planet.material.uniforms.u_time.value = Math.sin(Math.PI * 2 * playhead);
       planet.material.uniforms.u_scale.value =
         1 + 6 * Math.abs(Math.sin(Math.PI * 2 * playhead));
 
-      planet.rotation.x = Math.sin(-rotation);
-      planet.rotation.y = Math.cos(-rotation);
-      planet.rotation.z = Math.cos(-rotation);
-
-      // camera.position.set(2, 2, -8 + 6 * Math.sin(playhead * Math.PI));
-      // const off = Random.noise1D(time / 8);
-      // camera.position.set(2, 2 - 2 * off, -4 + 4 * off);
+      // planet.rotation.x = Math.sin(-playhead * 2 * Math.PI);
+      // planet.rotation.y = Math.cos(-playhead * 2 * Math.PI);
+      // planet.rotation.z = Math.cos(-playhead * 2 * Math.PI);
 
       controls.update();
       renderer.render(scene, camera);
@@ -176,7 +143,8 @@ function silkyPlanet(width, height, scale, background) {
       u_time: { value: 0 },
       u_resolution: { value: [width, height] },
       u_scale: { value: 1 },
-      u_background: { value: new THREE.Color(background) },
+      u_background: { value: new THREE.Color('#F9EE54') },
+      u_color: { value: new THREE.Color('#F3A903') },
     },
     vertexShader: /*glsl*/ `
       precision highp float;
@@ -204,6 +172,7 @@ function silkyPlanet(width, height, scale, background) {
       uniform float u_time;
       uniform float u_scale;
       uniform vec3 u_background;
+      uniform vec3 u_color;
 
       varying vec3 vPosition;
       varying vec2 vUv;
@@ -234,7 +203,7 @@ function silkyPlanet(width, height, scale, background) {
 
         len += v * u_scale;
         // vec3 color = vec3(cos(len), cos(len), cos(len));
-        vec3 color = mix(u_background, vec3(0.5, 0.5, 0.5), cos(len));
+        vec3 color = mix(u_background, u_color, cos(len));
 
         float grainSize = 1.0;
         float g = grain(vUv, u_resolution / grainSize);
@@ -256,13 +225,14 @@ function silkyPlanet(width, height, scale, background) {
 function particleMaterial(width, height, color, background) {
   return new THREE.ShaderMaterial({
     transparent: true,
-    // blending: THREE.NormalBlending,
+    // blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
     uniforms: {
       u_time: { value: 0 },
       u_resolution: { value: [width, height] },
       u_scale: { value: 1 },
       u_color: { value: new THREE.Color(color) },
-      u_background: { value: new THREE.Color(background) },
+      u_color2: { value: new THREE.Color('#fff') },
       u_opacity: { value: 0.8 },
     },
     vertexShader: /*glsl*/ `
@@ -272,7 +242,7 @@ function particleMaterial(width, height, color, background) {
 
       void main () {
         vPosition = position;
-        gl_PointSize = 1.0;
+        gl_PointSize = 2.0;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         vUv = position.xy * 0.5 + 0.5;
       }
@@ -283,11 +253,11 @@ function particleMaterial(width, height, color, background) {
       #endif
 
       #pragma glslify: noise = require(glsl-noise/simplex/4d);
-      #pragma glslify: grain = require(glsl-film-grain);
-      #pragma glslify: blend = require('glsl-blend-soft-light');
+      #define gold vec3(1.0, 0.843, 0.0)
 
+      uniform vec2 u_resolution;
       uniform vec3 u_color;
-      uniform vec3 u_background;
+      uniform vec3 u_color2;
       uniform float u_opacity;
       uniform float u_time;
 
@@ -296,8 +266,8 @@ function particleMaterial(width, height, color, background) {
 
       void main(){
         float t = 1.0 + noise(vec4(vPosition, u_time));
-        vec3 color = mix(vec3(0.4,0.243,0.137), u_color, t);
-        gl_FragColor = vec4(color, u_opacity);
+        vec3 color = mix(u_color2, u_color, t);
+        gl_FragColor = vec4(color, 0.5);
       }
     `),
   });
@@ -391,18 +361,6 @@ function aizawaAttractor([x, y, z], timestep) {
   const dy = (d * x + (z - b) * y) * timestep;
   const dz =
     (c + a * z - (z * z * z) / 3 - x * x + f * z * (x * x * x)) * timestep;
-
-  return [dx, dy, dz];
-}
-
-function arneodoAttractor([x, y, z], timestep) {
-  const a = -5.5;
-  const b = 3.5;
-  const d = -1;
-
-  const dx = y * timestep;
-  const dy = z * timestep;
-  const dz = (-a * x - b * y - z + d * Math.pow(x, 3)) * timestep;
 
   return [dx, dy, dz];
 }
