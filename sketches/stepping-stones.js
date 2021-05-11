@@ -21,7 +21,7 @@ const sketch = ({ width, height, context }) => {
     canvas: context.canvas,
   });
 
-  const background = '#fff';
+  const background = '#000';
   renderer.setClearColor(background, 1);
 
   // Setup a camera
@@ -167,9 +167,39 @@ const colors = ['#DEB4D8', '#DF8488', '#DA3F3D', '#DAAA97'].map((c) =>
 const white = new THREE.Color('#E7EEF6').toArray();
 
 function cube(position, color) {
-  const geometry = new THREE.BoxGeometry(SIZE, SIZE * 0.25, SIZE);
+  // const geometry = new THREE.BoxGeometry(SIZE, SIZE * 0.25, SIZE);
   // const colorsAttr = geometry.attributes.normal.clone();
   // geometry.setAttribute('color', colorsAttr);
+
+  // const bevel = SIZE * 0.04;
+  // const length = SIZE - 4 * bevel;
+  // const width = SIZE * 0.25 - 4 * bevel;
+
+  // const shape = new THREE.Shape();
+  // shape.moveTo(0, 0);
+  // shape.lineTo(0, width);
+  // shape.lineTo(length, width);
+  // shape.lineTo(length, 0);
+  // shape.lineTo(0, 0);
+
+  // const extrudeSettings = {
+  //   steps: 1,
+  //   depth: SIZE,
+  //   bevelEnabled: true,
+  //   bevelThickness: bevel,
+  //   bevelSize: bevel,
+  //   bevelOffset: 1 * bevel,
+  //   bevelSegments: 5,
+  // };
+
+  // const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+
+  const bevel = SIZE * 0.04;
+  const width = SIZE;
+  const height = SIZE * 0.25;
+  const depth = SIZE;
+
+  const geometry = createBoxWithRoundedEdges(width, height, depth, bevel, 4);
 
   const colorsAttr = cubeColours(geometry);
 
@@ -275,4 +305,34 @@ function pickColor(neighbourColors) {
     Random.pick(['#0A1918', '#FDC22D', '#F992E2', '#FB331C', '#3624F4']);
   const c = col();
   return neighbourColors.includes(c) ? pickColor(neighbourColors) : c;
+}
+
+function createBoxWithRoundedEdges(width, height, depth, radius0, smoothness) {
+  let shape = new THREE.Shape();
+  let eps = 0.00001;
+  let radius = radius0 - eps;
+  shape.absarc(eps, eps, eps, -Math.PI / 2, -Math.PI, true);
+  shape.absarc(eps, height - radius * 2, eps, Math.PI, Math.PI / 2, true);
+  shape.absarc(
+    width - radius * 2,
+    height - radius * 2,
+    eps,
+    Math.PI / 2,
+    0,
+    true
+  );
+  shape.absarc(width - radius * 2, eps, eps, 0, -Math.PI / 2, true);
+  let geometry = new THREE.ExtrudeBufferGeometry(shape, {
+    amount: depth - radius0 * 2,
+    bevelEnabled: true,
+    bevelSegments: smoothness * 2,
+    steps: 1,
+    bevelSize: radius,
+    bevelThickness: radius0,
+    curveSegments: smoothness,
+  });
+
+  geometry.center();
+
+  return geometry;
 }
