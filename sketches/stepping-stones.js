@@ -2,21 +2,36 @@ global.THREE = require('three');
 require('three/examples/js/controls/OrbitControls');
 
 const Random = require('canvas-sketch-util/random');
+const { mapRange } = require('canvas-sketch-util/math');
 const canvasSketch = require('canvas-sketch');
-const glslify = require('glslify');
+
+const DEBUG = false;
 
 const settings = {
   scaleToView: true,
   dimensions: [1080, 1080],
   context: 'webgl',
   animate: true,
-  duration: 4,
+  duration: 6,
   fps: 50,
 };
 
 const SIZE = 4;
 
-const sketch = ({ width, height, context }) => {
+const sketch = async ({ width, height, context }) => {
+  // Setup text rendering
+  const textManager = await canvasSketch(textSketch, {
+    dimensions: [1024, 256],
+    hotkeys: false,
+    parent: false,
+  });
+
+  const otherCanvas = textManager.props.canvas;
+
+  const map = new THREE.Texture(otherCanvas);
+  textManager.update();
+  map.needsUpdate = true;
+
   const renderer = new THREE.WebGLRenderer({
     canvas: context.canvas,
   });
@@ -46,53 +61,70 @@ const sketch = ({ width, height, context }) => {
   // const axesHelper = new THREE.AxesHelper(5);
   // scene.add(axesHelper);
 
-  const cubeColors = cubeColourField();
+  const cubes = [];
 
-  row(1, -3).forEach((position, idx) => {
-    scene.add(cube(position, cubeColors[6][idx]));
-  });
+  const rows = [
+    [1, -3],
+    [0, -2],
+    [-1, -1],
+    [0, 0],
+    [1, 1],
+    [0, 2],
+    [-1, 3],
+  ];
 
-  row(0, -2).forEach((position, idx) => {
-    scene.add(cube(position, cubeColors[5][idx]));
-  });
+  const cubeColors = cubeColourField(rows.length);
 
-  row(-1, -1).forEach((position, idx) => {
-    scene.add(cube(position, cubeColors[4][idx]));
-  });
+  rows.forEach((rowPosition, rowIdx) => {
+    row(...rowPosition).forEach((position, idx) => {
+      const _cube = cube(position, cubeColors[rows.length - 1 - rowIdx][idx]);
 
-  row(0, 0).forEach((position, idx) => {
-    scene.add(cube(position, cubeColors[3][idx]));
-  });
+      const angle = Math.atan2(position[2], position[0]);
+      const r = Math.hypot(position[2], position[0]);
+      const delay = mapRange(r, 0, 17, 0, Math.PI);
 
-  row(1, 1).forEach((position, idx) => {
-    scene.add(cube(position, cubeColors[2][idx]));
-  });
+      cubes.push({
+        cube: _cube,
+        origPosition: position,
+        loc: [rowIdx, idx],
+        delay,
+        angle,
+        r,
+      });
 
-  row(0, 2).forEach((position, idx) => {
-    scene.add(cube(position, cubeColors[1][idx]));
-  });
-
-  row(-1, 3).forEach((position, idx) => {
-    scene.add(cube(position, cubeColors[0][idx]));
+      scene.add(_cube);
+    });
   });
 
   scene.add(plane(camera, [5, 20], [-8.1, 0, 0]));
   scene.add(plane(camera, [5, 20], [8.1, 0, 0]));
-  scene.add(plane(camera, [12, 5], [0, -9.45, 0]));
-  scene.add(plane(camera, [12, 5], [0, 11, -28.5]));
-  // scene.add(plane(camera, [12, 5], [0, 11, -30]));
+  scene.add(
+    plane(
+      camera,
+      [12, 3],
+      [0, -8.5, 0],
+      new THREE.MeshBasicMaterial({
+        map,
+      })
+    )
+  );
+  // scene.add(plane(camera, [12, 5], [0, 9, -28.5]));
+  scene.add(plane(camera, [6, 2.5], [0, 9.6, -30.4]));
 
-  const light1 = new THREE.AmbientLight('#E7EEF6', 1);
-  scene.add(light1);
-  const light2 = new THREE.PointLight('#ff20f0', 3, 30);
-  light2.position.set(10, 10, -5);
-  scene.add(light2);
-  const light3 = new THREE.PointLight('#e4be00', 3, 40);
-  light3.position.set(-1, 15, -5);
-  scene.add(light3);
+  scene.add(plane(camera, [6, 2.5], [-6, 9.6, -25]));
+  scene.add(plane(camera, [6, 2.5], [6, 9.6, -25]));
 
-  scene.add(new THREE.PointLightHelper(light2, 1));
-  scene.add(new THREE.PointLightHelper(light3, 1));
+  const whiteLight = new THREE.AmbientLight('#736fbd', 1);
+  scene.add(whiteLight);
+  const pinkLight = new THREE.PointLight('#ff20f0', 3, 30);
+  scene.add(pinkLight);
+  const yellowLight = new THREE.PointLight('#e4be00', 3, 40);
+  scene.add(yellowLight);
+
+  if (DEBUG) {
+    scene.add(new THREE.PointLightHelper(pinkLight, 1));
+    scene.add(new THREE.PointLightHelper(yellowLight, 1));
+  }
 
   return {
     resize({ pixelRatio, viewportWidth, viewportHeight }) {
@@ -101,9 +133,19 @@ const sketch = ({ width, height, context }) => {
       camera.aspect = viewportWidth / viewportHeight;
       camera.updateProjectionMatrix();
     },
-    render({ playhead, duration, deltaTime }) {
+    render({ playhead }) {
       controls.update();
       renderer.render(scene, camera);
+
+      const t = playhead * Math.PI;
+
+      // Animate lights
+      moveLights(yellowLight, pinkLight, t, 'CIRCLE', playhead);
+      // Animate cubes
+      // noise(cubes, t);
+      breathe(cubes, t);
+      // wave(cubes, t);
+      // shift(cubes, t);
     },
     unload() {
       controls.dispose();
@@ -114,13 +156,120 @@ const sketch = ({ width, height, context }) => {
 
 canvasSketch(sketch, settings);
 
-function plane(camera, [width, height], [offsetX, offsetY, offsetZ]) {
-  const geometry = new THREE.PlaneGeometry(width, height, 1);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    // color: 0xffff00,
-    side: THREE.DoubleSide,
+/**
+ * Animations
+ */
+function noise(cubes, t) {
+  cubes.forEach((c) => {
+    const y = Random.noise4D(
+      c.origPosition[0],
+      c.origPosition[2],
+      c.delay,
+      Math.cos(t * 2) + Math.sin(t * 2)
+    );
+    c.cube.scale.set(1, 1 + 0.25 * y, 1);
   });
+}
+
+function shift(cubes, t) {
+  cubes.forEach((c) => {
+    c.cube.position.set(
+      c.origPosition[0],
+      c.origPosition[1] + 0.25 * Math.sin(c.delay + _t),
+      c.origPosition[2]
+    );
+  });
+}
+
+function breathe(cubes, t) {
+  cubes.forEach((c) => {
+    c.cube.scale.set(
+      1 - 0.02 * Math.sin(t * 2),
+      1 - 0.02 * Math.sin(t),
+      1 - 0.02 * Math.sin(t * 2)
+    );
+  });
+}
+
+function wave(cubes, t) {
+  cubes.forEach((c) => {
+    c.cube.scale.set(1, 1 - 0.5 * Math.sin(c.delay + t * 2), 1);
+  });
+}
+
+function moveLights(yellowLight, pinkLight, t, mode, playhead) {
+  if (mode === 'HOVER') {
+    pinkLight.position.set(10, 10 + 5 * Math.sin(t * 2), -5);
+    yellowLight.position.set(-12, 15 + 5 * Math.sin(t * 2), 2);
+  } else {
+    const angle1 = (Math.sin(Math.PI * playhead) * Math.PI) / 2;
+    const angle2 = mapRange(
+      Math.sin(Math.PI * playhead),
+      0,
+      1,
+      0.75 * Math.PI,
+      0
+    );
+
+    pinkLight.position.set(
+      -5 + 8 * Math.cos(angle2),
+      15,
+      -5 + 8 * Math.sin(angle2)
+    );
+    yellowLight.position.set(
+      -1 + 16 * Math.cos(angle1),
+      15,
+      -5 + 16 * Math.sin(angle1)
+    );
+  }
+}
+
+/**
+ * Geometries
+ */
+function createBoxWithRoundedEdges(width, height, depth, radius0, smoothness) {
+  let shape = new THREE.Shape();
+  let eps = 0.00001;
+  let radius = radius0 - eps;
+  shape.absarc(eps, eps, eps, -Math.PI / 2, -Math.PI, true);
+  shape.absarc(eps, height - radius * 2, eps, Math.PI, Math.PI / 2, true);
+  shape.absarc(
+    width - radius * 2,
+    height - radius * 2,
+    eps,
+    Math.PI / 2,
+    0,
+    true
+  );
+  shape.absarc(width - radius * 2, eps, eps, 0, -Math.PI / 2, true);
+  let geometry = new THREE.ExtrudeBufferGeometry(shape, {
+    depth: depth - radius0 * 2,
+    bevelEnabled: true,
+    bevelSegments: smoothness * 2,
+    steps: 1,
+    bevelSize: radius,
+    bevelThickness: radius0,
+    curveSegments: smoothness,
+  });
+
+  geometry.center();
+
+  return geometry;
+}
+
+function plane(
+  camera,
+  [width, height],
+  [offsetX, offsetY, offsetZ],
+  _material
+) {
+  const geometry = new THREE.PlaneGeometry(width, height, 1);
+  const material =
+    _material ||
+    new THREE.MeshBasicMaterial({
+      color: DEBUG ? 0xffff00 : 0xffffff,
+      side: THREE.DoubleSide,
+    });
   const plane = new THREE.Mesh(geometry, material);
 
   plane.position.copy(camera.position);
@@ -133,15 +282,36 @@ function plane(camera, [width, height], [offsetX, offsetY, offsetZ]) {
   return plane;
 }
 
+const textSketch = () => {
+  return ({ context, width, height }) => {
+    const text = 'चमकीले पत्थर';
+
+    // Clear canvas
+    context.clearRect(0, 0, width, height);
+
+    // Draw background
+    context.fillStyle = 'white';
+    context.fillRect(0, 0, width, height);
+
+    // Draw text
+    const fontSize = 60;
+    context.fillStyle = 'black';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.font = `${fontSize}px sans-serif`;
+    context.fillText(text || '', width * 0.5, height * 0.35);
+  };
+};
+
+/**
+ * Cube Stuff
+ */
 function row(x, y) {
   const yPos =
     y === 0
       ? 0
       : Math.sign(y) * ((Math.abs(y) - 1) * SIZE + (Math.abs(y) * SIZE) / 4);
   const xPos = x * SIZE;
-
-  // -SIZE + (2 * -SIZE) / 4;
-  // -SIZE * ((y-1) + (y * 1) / 4);
 
   return [
     [xPos + yPos - SIZE * 1.5, 0, yPos + SIZE * 1.5],
@@ -151,80 +321,19 @@ function row(x, y) {
   ];
 }
 
-// const colors = [
-//   // '#0A1918',
-//   '#FDC22D',
-//   '#F992E2',
-//   // '#E7EEF6',
-//   '#FB331C',
-//   '#3624F4',
-// ].map((c) => new THREE.Color(c).toArray());
-
-const colors = ['#DEB4D8', '#DF8488', '#DA3F3D', '#DAAA97'].map((c) =>
-  new THREE.Color(c).toArray()
-);
-
-const white = new THREE.Color('#E7EEF6').toArray();
-
 function cube(position, color) {
-  // const geometry = new THREE.BoxGeometry(SIZE, SIZE * 0.25, SIZE);
-  // const colorsAttr = geometry.attributes.normal.clone();
-  // geometry.setAttribute('color', colorsAttr);
-
-  // const bevel = SIZE * 0.04;
-  // const length = SIZE - 4 * bevel;
-  // const width = SIZE * 0.25 - 4 * bevel;
-
-  // const shape = new THREE.Shape();
-  // shape.moveTo(0, 0);
-  // shape.lineTo(0, width);
-  // shape.lineTo(length, width);
-  // shape.lineTo(length, 0);
-  // shape.lineTo(0, 0);
-
-  // const extrudeSettings = {
-  //   steps: 1,
-  //   depth: SIZE,
-  //   bevelEnabled: true,
-  //   bevelThickness: bevel,
-  //   bevelSize: bevel,
-  //   bevelOffset: 1 * bevel,
-  //   bevelSegments: 5,
-  // };
-
-  // const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-
   const bevel = SIZE * 0.04;
   const width = SIZE;
   const height = SIZE * 0.25;
   const depth = SIZE;
 
-  const geometry = createBoxWithRoundedEdges(width, height, depth, bevel, 4);
+  const geometry = createBoxWithRoundedEdges(width, height, depth, bevel, 12);
 
-  const colorsAttr = cubeColours(geometry);
-
-  geometry.setAttribute(
-    'color',
-    new THREE.BufferAttribute(new Float32Array(colorsAttr), 3)
-  );
-
-  // const material = new THREE.MeshBasicMaterial({
-  //   vertexColors: THREE.VertexColors,
-  // });
   const material = new THREE.MeshPhysicalMaterial({
     clearcoat: 1,
-    clearcoatRoughness: 0,
+    clearcoatRoughness: 0.1,
     sheen: new THREE.Color('#736fbd'),
     color,
-    // color: Random.pick(['hotpink', '#e4be00', '#736fbd']),
-    // color: Random.pick([
-    //   '#0A1918',
-    //   '#FDC22D',
-    //   '#F992E2',
-    //   // '#E7EEF6',
-    //   '#FB331C',
-    //   '#3624F4',
-    // ]),
   });
 
   const cube = new THREE.Mesh(geometry, material);
@@ -232,50 +341,7 @@ function cube(position, color) {
   return cube;
 }
 
-const MODE = 'POSITIONS';
-
-function cubeColours(geometry) {
-  const colorsAttr = [];
-  const clrByPosition = {};
-
-  if (MODE === 'NORMALS') {
-    const normals = geometry.attributes.normal.array;
-
-    for (let index = 0; index < normals.length; index += 3) {
-      if (normals[index + 1] === -0.5) {
-        colorsAttr.push(...white);
-      } else {
-        const p = `${normals[index]} ${normals[index + 1]} ${
-          normals[index + 2]
-        }`;
-        const c = Random.pick(colors);
-        clrByPosition[p] = clrByPosition[p] || c;
-
-        colorsAttr.push(...clrByPosition[p]);
-      }
-    }
-  } else {
-    const positions = geometry.attributes.position.array;
-
-    for (let index = 0; index < positions.length; index += 3) {
-      if (positions[index + 1] === -0.5) {
-        colorsAttr.push(...white);
-      } else {
-        const p = `${positions[index + 1]} ${positions[index]}`;
-        const c = Random.pick(colors);
-        clrByPosition[p] = clrByPosition[p] || c;
-
-        colorsAttr.push(...clrByPosition[p]);
-      }
-    }
-  }
-
-  return colorsAttr;
-}
-
-function cubeColourField() {
-  const rowCount = 7;
-  const colCount = 4;
+function cubeColourField(rowCount, colCount = 4) {
   const colors = [];
 
   const col = () =>
@@ -302,37 +368,14 @@ function cubeColourField() {
 
 function pickColor(neighbourColors) {
   const col = () =>
-    Random.pick(['#0A1918', '#FDC22D', '#F992E2', '#FB331C', '#3624F4']);
+    Random.pick([
+      '#0A1918',
+      '#FDC22D',
+      '#F992E2',
+      '#FB331C',
+      '#3624F4',
+      '#E7EEF6',
+    ]);
   const c = col();
   return neighbourColors.includes(c) ? pickColor(neighbourColors) : c;
-}
-
-function createBoxWithRoundedEdges(width, height, depth, radius0, smoothness) {
-  let shape = new THREE.Shape();
-  let eps = 0.00001;
-  let radius = radius0 - eps;
-  shape.absarc(eps, eps, eps, -Math.PI / 2, -Math.PI, true);
-  shape.absarc(eps, height - radius * 2, eps, Math.PI, Math.PI / 2, true);
-  shape.absarc(
-    width - radius * 2,
-    height - radius * 2,
-    eps,
-    Math.PI / 2,
-    0,
-    true
-  );
-  shape.absarc(width - radius * 2, eps, eps, 0, -Math.PI / 2, true);
-  let geometry = new THREE.ExtrudeBufferGeometry(shape, {
-    amount: depth - radius0 * 2,
-    bevelEnabled: true,
-    bevelSegments: smoothness * 2,
-    steps: 1,
-    bevelSize: radius,
-    bevelThickness: radius0,
-    curveSegments: smoothness,
-  });
-
-  geometry.center();
-
-  return geometry;
 }
