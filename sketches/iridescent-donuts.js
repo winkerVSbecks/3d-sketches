@@ -72,42 +72,33 @@ const sketch = ({ context }) => {
       },
       uniforms: {
         u_time: { value: 0 },
-        u_camera: { value: new THREE.Vector3(2, 2, -4) },
       },
       vertexShader: /*glsl*/ `
-        uniform vec3 u_camera;
         varying vec3 vPosition;
         varying vec3 vNormal;
         varying vec3 vLight;
-        varying vec3 vCamera;
-        varying vec2 vUv;
 
         void main () {
           vPosition = (projectionMatrix* modelViewMatrix * vec4(position, 1.0)).xyz;
           vNormal = (projectionMatrix* modelViewMatrix * vec4(normal, 1.0)).xyz;
           vLight = (projectionMatrix* modelViewMatrix * vec4(-4.,-4.,-4., 1.0)).xyz;
-          vCamera = (projectionMatrix* modelViewMatrix * vec4(u_camera, 1.0)).xyz;
 
           vNormal = normalize(mat3(modelMatrix) * normal.xyz);
           vPosition = (modelMatrix * vec4(position, 1.0)).xyz;
-          vCamera = normalize(cameraPosition - vPosition);
 
-
-          vUv = uv;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
       fragmentShader: glslify(/* glsl */ `
+        // based on https://codepen.io/winkerVSbecks/pen/wvdyREG?editors=1000
         precision highp float;
         #pragma glslify: aastep = require('glsl-aastep');
 
         uniform float u_time;
-        uniform vec3 u_camera;
 
         varying vec3 vPosition;
         varying vec3 vNormal;
         varying vec3 vLight;
-        varying vec3 vCamera;
         varying vec2 vUv;
 
         // Pallete function by Inigo Quilez - iquilezles.org
@@ -138,46 +129,6 @@ const sketch = ({ context }) => {
           return (m * vec4(v, 1.0)).xyz;
         }
 
-        // Torus function by Inigo Quilez - iquilezles.org
-        // p - position, t - size
-        float sdTorus(vec3 p, vec2 t) {
-          vec2 q = vec2(length(p.xz)-t.x,p.y);
-          return length(q)-t.y;
-        }
-
-        float scene(vec3 pos) {
-          return abs(length(pos - vPosition));
-        }
-
-        const int RAYMARCH_MAX_STEPS = 500;
-        const float RAYMARCH_MAX_DIST = 10.;
-        const float EPSILON = 0.0001;
-
-        // hoisting for raymarch fn return val
-        vec4 shade (vec3 pos, vec3 rayDir, float rayDepth);
-
-        vec4 raymarch(vec3 rayDir, vec3 pos) {
-          // Define the start state
-          // reset to 0 steps
-          float currentDist = 0.0;
-          float rayDepth = 0.0;
-          vec3 rayLength = vec3(0.0);
-
-          // shooting the ray
-          for (int i=0; i < RAYMARCH_MAX_STEPS; i++) {
-            // steps travelled
-            currentDist = scene(pos + rayDir * rayDepth);
-            rayDepth += currentDist;
-
-            // We're inside the scene - magic happens here
-            if (currentDist < EPSILON) return shade(pos + rayDir * rayDepth, rayDir, rayDepth);
-            // We've gone too far
-            if (rayDepth > RAYMARCH_MAX_DIST) return vec4(0, 0, 0, 1.);
-          }
-
-          return vec4(0, 0, 0, 1.);
-        }
-
         float diffuse (in vec3 light, in vec3 nor) {
           return clamp(0.5, 1., dot(nor, light));
         }
@@ -205,15 +156,18 @@ const sketch = ({ context }) => {
             vec3(0., 0.33, 0.67) // phase
           );
 
-          // vec3 lightPos = rotate(vec3(1.), vec3(0, 1, 0), 3.14 * u_time);
           vec3 lightPos = rotate(vLight, vec3(0, 1, 0), 3.14 * 2. * u_time);
-          // vec3 lightPos = vec3(vCamera);
 
           float dif = diffuse(lightPos, nor);
           color = dif * baseColor(pos, nor, rayDir, rayDepth);
           vec4 shapeColor = vec4(color, 1.0);
 
           return shapeColor;
+        }
+
+        vec4 iridescent(vec3 rayDir) {
+          float rayDepth = length(vPosition);
+          return shade(vPosition + rayDir * rayDepth, rayDir, rayDepth);
         }
 
         float outerRim () {
@@ -224,7 +178,7 @@ const sketch = ({ context }) => {
 
         void main() {
           vec3 rayDir = normalize(vPosition); // DOF
-          vec4 iridescence = vec4(raymarch(rayDir, vec3(0)));
+          vec4 iridescence = vec4(iridescent(rayDir));
 
           // outer stroke
           float rim2 = outerRim();
