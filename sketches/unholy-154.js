@@ -6,12 +6,12 @@ const Random = require('canvas-sketch-util/random');
 const Color = require('canvas-sketch-util/color');
 const risoColors = require('riso-colors').map((h) => h.hex);
 const paperColors = require('paper-colors').map((h) => h.hex);
-global.THREE = require('three');
+global.THREE = require('three124');
 
 // Include any additional ThreeJS examples below
-require('three/examples/js/controls/OrbitControls');
-require('three/examples/js/renderers/Projector');
-require('three/examples/js/renderers/SVGRenderer');
+require('three124/examples/js/controls/OrbitControls');
+require('three124/examples/js/renderers/Projector');
+require('three124/examples/js/renderers/SVGRenderer');
 
 const canvasSketch = require('canvas-sketch');
 

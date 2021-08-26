@@ -5,10 +5,10 @@
 const Random = require('canvas-sketch-util/random');
 const { lerp } = require('canvas-sketch-util/math');
 const clrs = require('../clrs')();
-global.THREE = require('three');
+global.THREE = require('three124');
 
 // Include any additional ThreeJS examples below
-require('three/examples/js/controls/OrbitControls');
+require('three124/examples/js/controls/OrbitControls');
 
 const canvasSketch = require('canvas-sketch');
 
@@ -217,7 +217,7 @@ function branch({ size, y }, fill, stroke) {
   const branchEdgesGeometry = new THREE.EdgesGeometry(branchGeometry);
   const line = new THREE.LineSegments(
     branchEdgesGeometry,
-    new THREE.LineBasicMaterial({ color: stroke, linewidth: 2 })
+    new THREE.LineBasicMaterial({ color: stroke, lineWidth: 4 })
   );
   group.add(line);
 
@@ -242,7 +242,7 @@ function trunk({ width, height }, fill, stroke) {
   const trunkEdgesGeometry = new THREE.EdgesGeometry(trunkGeometry);
   const line = new THREE.LineSegments(
     trunkEdgesGeometry,
-    new THREE.LineBasicMaterial({ color: stroke, linewidth: 2 })
+    new THREE.LineBasicMaterial({ color: stroke, lineWidth: 4 })
   );
   group.add(line);
 

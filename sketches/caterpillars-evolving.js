@@ -6,14 +6,18 @@ global.THREE = require('three124');
 require('three124/examples/js/controls/OrbitControls');
 const canvasSketch = require('canvas-sketch');
 const Random = require('canvas-sketch-util/random');
-const { GridHelper } = require('three124');
+const { lerp } = require('canvas-sketch-util/math');
 const clrs = require('../clrs')();
 
 const settings = {
-  dimensions: [1600, 1600],
+  dimensions: [1080, 1080],
   animate: true,
-  duration: 2,
+  duration: 10,
   context: 'webgl',
+};
+
+const config = {
+  targets: 6,
 };
 
 const sketch = ({ context }) => {
@@ -112,25 +116,18 @@ const sketch = ({ context }) => {
     },
     vertexShader,
     fragmentShader,
-    // side: THREE.DoubleSide,
-  });
-
-  const wireFrameMaterial = new THREE.MeshBasicMaterial({
-    color: foreground,
-    wireframe: true,
-    flatShading: true,
-  });
-
-  const normalMaterial = new THREE.MeshNormalMaterial({
-    flatShading: true,
   });
 
   // Setup a geometry
-  const geometry = sculptureGeometry(10, 5);
+  const targetGeometries = new Array(config.targets)
+    .fill()
+    .map(() => sculptureGeometry(10, 5));
+  targetGeometries.push(targetGeometries[0]);
+
+  let geometry = targetGeometries[0];
   geometry.computeVertexNormals();
 
   const sculpture = new THREE.Mesh(geometry, material);
-  // scene.add(sculpture);
 
   const box = new THREE.Box3().setFromObject(sculpture);
   box.getCenter(sculpture.position).multiplyScalar(-1);
@@ -141,6 +138,11 @@ const sketch = ({ context }) => {
 
   // draw each frame
   return {
+    begin() {
+      sculpture.geometry = targetGeometries[0];
+      sculpture.geometry.attributes.position.needsUpdate = true;
+      sculpture.geometry.computeVertexNormals();
+    },
     // Handle resize events here
     resize({ pixelRatio, viewportWidth, viewportHeight }) {
       renderer.setPixelRatio(pixelRatio);
@@ -153,9 +155,13 @@ const sketch = ({ context }) => {
       camera.updateProjectionMatrix();
     },
     // Update & render your scene here
-    render({ playhead }) {
-      sculpture.rotation.x = (Math.PI / 16) * Math.sin(playhead * 2 * Math.PI);
-      sculpture.rotation.y = (Math.PI / 16) * Math.cos(playhead * 2 * Math.PI);
+    render({ playhead, deltaTime }) {
+      // sculpture.rotation.x = (Math.PI / 16) * Math.sin(playhead * 2 * Math.PI);
+      // sculpture.rotation.y = (Math.PI / 16) * Math.cos(playhead * 2 * Math.PI);
+
+      const targetIndex = Math.floor(playhead * config.targets) + 1;
+      const targetGeometry = targetGeometries[targetIndex];
+      morph(geometry, targetGeometry, deltaTime);
 
       controls.update();
       renderer.render(scene, camera);
@@ -171,6 +177,36 @@ const sketch = ({ context }) => {
 canvasSketch(sketch, settings);
 
 const ELEVATION = 0.25;
+
+function morph(current, target, deltaTime) {
+  const positions = current.attributes.position.array;
+  const targetPositions = target.attributes.position.array;
+
+  for (let i = 0; i < positions.length; i += 3) {
+    let x = positions[i];
+    let y = positions[i + 1];
+    let z = positions[i + 2];
+
+    // lerp
+    x = interpolate(x, targetPositions[i], deltaTime);
+    y = interpolate(y, targetPositions[i + 1], deltaTime);
+    z = interpolate(z, targetPositions[i + 2], deltaTime);
+
+    current.attributes.position.set([x, y, z], i);
+  }
+
+  current.attributes.position.needsUpdate = true;
+  current.computeVertexNormals();
+}
+
+function interpolate(current, target, deltaTime) {
+  // Determine a rate at which we will step forward each frame,
+  // making it dependent on the time elapsed since last frame
+  const rate = 4 * deltaTime;
+
+  // Interpolate toward the target point at this rate
+  return lerp(current, target, rate);
+}
 
 function sculptureGeometry(size, segments = 1) {
   const geometry = new THREE.BufferGeometry();

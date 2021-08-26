@@ -2,8 +2,8 @@
  * Inspired by:
  * https://www.artsy.net/artwork/matt-shlian-some-caterpillars-stay-caterpillars-7-aquamarine
  */
-global.THREE = require('three');
-require('three/examples/js/controls/OrbitControls');
+global.THREE = require('three124');
+require('three124/examples/js/controls/OrbitControls');
 const canvasSketch = require('canvas-sketch');
 const Random = require('canvas-sketch-util/random');
 const clrs = require('../clrs')();
