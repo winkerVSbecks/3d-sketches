@@ -23,6 +23,7 @@ const sketch = ({ gl, width, height }) => {
     vert,
     frag,
     uniforms: {
+      u_colorMode: 0,
       u_resolution: [width, height],
       u_col_1: colors[0],
       u_col_2: colors[1],

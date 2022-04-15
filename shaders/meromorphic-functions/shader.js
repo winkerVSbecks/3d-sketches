@@ -29,6 +29,8 @@ export const frag = glsl(/* glsl */ `#version 300 es
   uniform vec2 u_b2;
   uniform vec2 u_b3;
 
+  uniform int u_colorMode;
+
   #define PI 3.1415926535897932384626433832795
 
   #define cx_mul(a, b) vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x)
@@ -105,10 +107,16 @@ export const frag = glsl(/* glsl */ `#version 300 es
       float imaginary = cx_log(result).y;
       float col = (imaginary / PI);
 
-      // fragColor = vec4(pal(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
-      fragColor = vec4(ntsc(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
-      // fragColor = vec4(soft(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
-      // fragColor = vec4(tangent(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
-      // fragColor = vec4(blend(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
+      if (u_colorMode == 0) {
+        fragColor = vec4(pal(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
+      } else if (u_colorMode == 1) {
+        fragColor = vec4(blend(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
+      } else if (u_colorMode == 2) {
+        fragColor = vec4(ntsc(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
+      } else if (u_colorMode == 3) {
+        fragColor = vec4(soft(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
+      } else if (u_colorMode == 4) {
+        fragColor = vec4(tangent(col, u_col_1, u_col_2, u_col_3, u_col_4),1.0);
+      }
   }
 `);
