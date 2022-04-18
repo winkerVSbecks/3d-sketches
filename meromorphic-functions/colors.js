@@ -1,10 +1,4 @@
-/**
- * Somewhat based on https://www.shadertoy.com/view/4s2SRt
- */
-const canvasSketch = require('canvas-sketch');
-const { lerp, lerpArray } = require('canvas-sketch-util/math');
 const Random = require('canvas-sketch-util/random');
-const createShader = require('canvas-sketch-util/shader');
 const Color = require('canvas-sketch-util/color');
 const { generateRandomColorRamp } = require('fettepalette/dist/index.cjs');
 
